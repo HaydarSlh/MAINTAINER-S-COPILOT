@@ -1,0 +1,61 @@
+# =============================================================================
+# pyproject.toml
+# -----------------------------------------------------------------------------
+# Single source of truth for Python tooling across ALL Python services
+# (api, modelserver, chatbot, ml, rag, evals). Dependency groups keep each
+# container image lean — the api image does not need torch, the modelserver
+# image does not need streamlit.
+#
+# Tooling pinned here is what CI runs: ruff (lint), mypy (type-check), pytest.
+# =============================================================================
+
+[project]
+name = "maintainers-copilot"
+version = "0.1.0"
+description = "Maintainer's Copilot — AIE Week 7 (classifier + advanced RAG + authenticated chatbot + embeddable widget)"
+requires-python = ">=3.11"
+
+# Core deps shared by the api service. Kept minimal on purpose.
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "pgvector",
+    "redis",
+    "hvac",                 # Vault client
+    "minio",                # blob storage client
+    "fastapi-users[sqlalchemy]",
+    "httpx",                # calls to modelserver + LLM provider
+    "pyyaml",               # eval_thresholds.yaml
+]
+
+[project.optional-dependencies]
+# Installed only in the modelserver image (DL inference).
+modelserver = ["torch", "transformers", "spacy"]
+# Installed only in training jobs (DL track) — not in any runtime container.
+ml = ["torch", "transformers", "datasets", "scikit-learn", "mlflow", "pandas"]
+# RAG offline indexing + retrieval.
+rag = ["sentence-transformers", "rank-bm25"]
+# Streamlit internal tool image.
+chatbot = ["streamlit"]
+# Eval harness.
+evals = ["ragas", "pandas"]
+# Dev / CI.
+dev = ["ruff", "mypy", "pytest", "pytest-asyncio"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "evals"]

@@ -1,0 +1,1 @@
+{"_comment": "25 triples. One JSON object per line: {\"question\": ..., \"ideal_answer\": ..., \"ground_truth_chunks\": [...]}. Hand-curate Wed; hand-label 5 of 25 yourself and report agreement with the judge. This placeholder line is ignored by the loader."}

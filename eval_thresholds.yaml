@@ -1,0 +1,36 @@
+# =============================================================================
+# eval_thresholds.yaml  —  THE COMMITTED CI GATES
+# -----------------------------------------------------------------------------
+# Per the brief: "Two golden sets. Two CI gates. Committed thresholds."
+# Both eval suites run in CI on every push. eval_report.json is written every
+# run, stored in MinIO blob, and diffed against the previous green build.
+# Regression below these thresholds BLOCKS merge.
+#
+# HARD RULE (refuse-to-boot): the api refuses to boot if ANY committed
+# threshold here is set to zero / disabled. These numbers must mean something.
+#
+# Values below are PLACEHOLDERS to be replaced Tue/Wed once we have real
+# golden-set numbers — they must never be left at 0.
+# =============================================================================
+
+classification:
+  # Run against all three models (classical ML / fine-tuned encoder / LLM).
+  # Gate is on the deployed model; others are reported for the comparison.
+  macro_f1_min: 0.70
+  per_class_f1_min:
+    bug: 0.65
+    feature: 0.65
+    docs: 0.60
+    question: 0.60
+
+rag:
+  # Retrieval metrics
+  hit_at_5_min: 0.70
+  mrr_at_10_min: 0.55
+  # Generation metrics (RAGAS or frozen judge — decided in DECISIONS.md)
+  faithfulness_min: 0.75
+  answer_relevancy_min: 0.75
+
+# How much a metric may drop versus the previous green build before CI fails,
+# even if still above the absolute floor above. Catches slow regressions.
+regression_tolerance: 0.03

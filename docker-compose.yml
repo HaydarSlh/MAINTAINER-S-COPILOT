@@ -1,0 +1,61 @@
+# =============================================================================
+# docker-compose.yml — the full stack
+# -----------------------------------------------------------------------------
+# Per the brief: `docker-compose up` from a FRESH CLONE after
+# `cp .env.example .env` and filling the Vault root token must come up cleanly.
+#
+# Boot ordering (via depends_on + healthchecks, filled in as services land):
+#   vault -> db/redis/minio -> migrate (runs & exits) -> modelserver -> api
+#         -> chatbot / widget / host
+#
+# Only the Vault root token + ports come from .env. Every other secret is
+# seeded into Vault (scripts/vault_bootstrap.sh) and read at startup.
+# =============================================================================
+
+services:
+  vault:
+    image: hashicorp/vault
+    # dev mode; root token from .env. App refuses to boot if this is down.
+    # TODO: command/dev config, port ${VAULT_PORT}
+
+  db:
+    image: postgres:16
+    # TODO: pgvector-enabled image or init; password from Vault-seeded value
+
+  redis:
+    image: redis:7
+    # short-term memory + cache
+
+  minio:
+    image: minio/minio
+    # blob: model artifacts, eval_report.json, training plots, chunk snapshots
+
+  migrate:
+    build: { context: ., dockerfile: docker/migrate.Dockerfile }
+    # runs `alembic upgrade head` then exits; api waits for completion
+    depends_on: [db, vault]
+
+  modelserver:
+    build: { context: ., dockerfile: docker/modelserver.Dockerfile }
+    # refuses to boot if classifier weights missing / SHA mismatch
+    depends_on: [vault, minio]
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    # refuses to boot if Vault down / weights bad / tracing bad / threshold 0
+    depends_on: [migrate, vault, db, redis, minio, modelserver]
+
+  chatbot:
+    build: { context: ., dockerfile: docker/chatbot.Dockerfile }
+    depends_on: [api]
+
+  widget:
+    build: { context: ., dockerfile: docker/widget.Dockerfile }
+    # serves the React bundle + /widget.js loader
+
+  host:
+    build: { context: ., dockerfile: docker/host.Dockerfile }
+    # demo host page embedding the widget (distinct origin)
+    depends_on: [widget]
+
+# TODO: volumes (db, minio), networks, healthchecks, port mappings from .env

@@ -1,0 +1,24 @@
+# =============================================================================
+# CI — runs on every push (per the brief)
+# -----------------------------------------------------------------------------
+# Steps: lint, type-check, build images, run BOTH eval suites against the
+# golden sets, run the redaction test, smoke-test the stack. Eval regression
+# below the committed thresholds (eval_thresholds.yaml) BLOCKS merge.
+# =============================================================================
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: setup python, pip install ".[dev,evals]"
+      # TODO: ruff check .            (lint)
+      # TODO: mypy app modelserver    (type-check)
+      # TODO: docker compose build    (build images)
+      # TODO: pytest tests/test_redaction.py   (redaction gate)
+      # TODO: python -m evals.classification.run_eval   (classification gate)
+      # TODO: python -m evals.rag.run_eval              (RAG gate)
+      # TODO: docker compose up smoke test

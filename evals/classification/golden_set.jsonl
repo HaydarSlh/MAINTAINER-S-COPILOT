@@ -1,0 +1,1 @@
+{"_comment": "25 hand-curated issues, SEPARATE from the test split. One JSON object per line: {\"text\": <issue text>, \"label\": one of bug|feature|docs|question}. Hand-curated Tue. This placeholder line is ignored by the loader."}

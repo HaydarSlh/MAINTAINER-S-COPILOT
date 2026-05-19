@@ -1,0 +1,30 @@
+# Real secrets — only .env.example is committed
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ML artifacts — weights live in MinIO / are fetched, not committed.
+# Only the model CARD (architecture, hashes, metrics) is version-controlled.
+ml/artifacts/
+*.pt
+*.bin
+*.safetensors
+
+# Data — fetched issues are reproducible from fetch script; do not commit raw dumps
+ml/data/raw/
+ml/data/splits/
+
+# Node / widget build
+node_modules/
+widget/dist/
+
+# Local eval output (the canonical copy is written to MinIO blob)
+eval_report.json
