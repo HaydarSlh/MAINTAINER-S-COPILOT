@@ -1,0 +1,48 @@
+{
+  "_comment": "Populated by notebooks/training.ipynb Section 11 after each training run. Commit this file; do NOT commit the weights.",
+  "architecture": "distilbert-base-uncased",
+  "task": "4-class issue classification: bug / feature / docs / question",
+  "dataset": "pydantic/pydantic",
+  "train_data_hash": "ae43d06dcc026779dcf77630ffe856e577057875c4ca51166a92a62884bf4b5d",
+  "hyperparameters": {
+    "max_length": 256,
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "epochs": 4,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "freeze_layers": false,
+    "focal_loss_gamma": 2.0,
+    "early_stopping_patience": 2
+  },
+  "label_map": {
+    "bug": [
+      "bug v1",
+      "bug v2",
+      "bug"
+    ],
+    "feature": [
+      "feature request",
+      "enhancement"
+    ],
+    "docs": [
+      "documentation",
+      "docs"
+    ],
+    "question": [
+      "question",
+      "support"
+    ]
+  },
+  "test_metrics": {
+    "accuracy": 0.6916666666666667,
+    "f1_macro": 0.5922641044592264,
+    "f1_bug": 0.7398373983739838,
+    "f1_feature": 0.8373983739837398,
+    "f1_docs": 0.6504065040650406,
+    "f1_question": 0.1414141414141414
+  },
+  "weights_sha256": "56c40ad3a6f75384a0380bb6ff704332b0b826ce5bcf90063d17cc5d7e3a68b6",
+  "mlflow_run_id": "0a93534b39104b2bbcb367b159c63512",
+  "trained_on": "2026-05-20T17:58:36.455670"
+}

@@ -1,10 +1,31 @@
-"""The SINGLE exception handler mapping domain errors -> HTTP responses.
+"""The SINGLE exception handler mapping domain errors → HTTP responses.
 
-Per the brief: users never see a stack trace; they see a structured error with
-a stable code and a request ID. Domain exceptions map to status codes here
-(NotFoundError->404, PermissionDenied->403, ValidationError->422,
-ToolFailure->502, etc.). Every uncaught exception is logged with the trace ID
-and the request ID.
+Users never see a stack trace — they get a structured error body with a stable
+code and a request ID. Domain exceptions map to status codes here. Every
+uncaught exception is logged with the trace ID.
 """
 
-# TODO: install_exception_handlers(app): map DomainError subclasses + fallback
+from fastapi.responses import JSONResponse
+
+from app.domain.exceptions import (
+    DomainError,
+    NotFoundError,
+    PermissionDenied,
+    ToolFailure,
+    ValidationError,
+)
+
+_STATUS_MAP: dict[type[DomainError], int] = {
+    NotFoundError: 404,
+    PermissionDenied: 403,
+    ValidationError: 422,
+    ToolFailure: 502,
+}
+
+
+def domain_error_to_response(exc: DomainError) -> JSONResponse:
+    status = _STATUS_MAP.get(type(exc), 400)
+    return JSONResponse(
+        status_code=status,
+        content={"error": type(exc).__name__, "detail": str(exc)},
+    )

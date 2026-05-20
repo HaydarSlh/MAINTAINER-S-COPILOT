@@ -1,0 +1,11 @@
+{
+  "_comment": "MinIO object paths for classifier artifacts. Update after each training run and after uploading to MinIO (notebook Section 12).",
+  "bucket": "models",
+  "objects": {
+    "weights":          "classifier/model.safetensors",
+    "tokenizer_config": "classifier/tokenizer_config.json",
+    "tokenizer":        "classifier/tokenizer.json",
+    "config":           "classifier/config.json",
+    "classical": "classifier/classical_model.joblib"
+  }
+}

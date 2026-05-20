@@ -23,6 +23,7 @@ dependencies = [
     "pydantic-settings",
     "sqlalchemy[asyncio]",
     "asyncpg",
+    "psycopg2-binary",       # sync driver used only by Alembic migrations
     "alembic",
     "pgvector",
     "redis",
@@ -31,6 +32,8 @@ dependencies = [
     "fastapi-users[sqlalchemy]",
     "httpx",                # calls to modelserver + LLM provider
     "pyyaml",               # eval_thresholds.yaml
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-grpc",
 ]
 
 [project.optional-dependencies]

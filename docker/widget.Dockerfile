@@ -1,13 +1,17 @@
-# Image for the `widget` service: builds the React bundle (Vite) and serves
-# the bundle + /widget.js loader as static files with proper cache headers.
-# Multi-stage: node build -> static server.
+# Multi-stage: Vite build → nginx static server.
+# Serves the React bundle + /widget.js loader with proper cache headers.
 
-# TODO stage 1: node:20 -> npm ci && npm run build (widget/)
-# TODO stage 2: static server (nginx/caddy) serving widget/dist + widget-loader/
 FROM node:20-slim AS build
 WORKDIR /build
-# COPY widget/ ./ ; RUN npm ci && npm run build
+COPY widget/package*.json ./
+RUN npm ci
+COPY widget/ ./
+RUN npm run build
 
 FROM nginx:alpine
-# COPY --from=build /build/dist /usr/share/nginx/html
-# COPY widget-loader/widget.js /usr/share/nginx/html/widget.js
+COPY --from=build /build/dist /usr/share/nginx/html
+# widget.js loader served at /widget.js (embedded by host pages via <script src>)
+COPY widget/public/widget-loader.js /usr/share/nginx/html/widget.js
+COPY docker/nginx-widget.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 8080

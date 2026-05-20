@@ -1,8 +1,14 @@
 # Image for the `api` service (FastAPI: auth, chat, memory, RAG, widget config).
-# Installs only core deps (no torch/streamlit) to stay lean.
-# TODO: python:3.11-slim, pip install ".", uvicorn app.main:app
+# No torch / streamlit — stays lean. Secrets resolved from Vault at boot.
 
 FROM python:3.11-slim
 WORKDIR /srv
-COPY pyproject.toml ./
-# TODO: pip install . ; COPY app/ ; CMD uvicorn app.main:app --host 0.0.0.0
+
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir "."
+
+COPY app/ app/
+COPY prompts/ prompts/
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

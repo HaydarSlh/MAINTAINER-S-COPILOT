@@ -1,61 +1,201 @@
 # =============================================================================
 # docker-compose.yml — the full stack
 # -----------------------------------------------------------------------------
-# Per the brief: `docker-compose up` from a FRESH CLONE after
-# `cp .env.example .env` and filling the Vault root token must come up cleanly.
+# Usage (fresh clone):
+#   cp .env.example .env          # fill in VAULT_DEV_ROOT_TOKEN + secret vars
+#   docker-compose up --build
 #
-# Boot ordering (via depends_on + healthchecks, filled in as services land):
-#   vault -> db/redis/minio -> migrate (runs & exits) -> modelserver -> api
-#         -> chatbot / widget / host
+# Boot ordering (enforced via depends_on + healthchecks):
+#   vault → db / redis / minio → migrate (runs & exits) → modelserver → api
+#         → chatbot / widget → host
 #
-# Only the Vault root token + ports come from .env. Every other secret is
-# seeded into Vault (scripts/vault_bootstrap.sh) and read at startup.
+# Only VAULT_DEV_ROOT_TOKEN and service ports come from .env.
+# All real secrets are written via scripts/vault_bootstrap.sh and read from Vault.
 # =============================================================================
 
 services:
+
+  # ---------------------------------------------------------------------------
   vault:
-    image: hashicorp/vault
-    # dev mode; root token from .env. App refuses to boot if this is down.
-    # TODO: command/dev config, port ${VAULT_PORT}
+    image: hashicorp/vault:1.16
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "${VAULT_DEV_ROOT_TOKEN}"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      - "${VAULT_PORT:-8200}:8200"
+    cap_add: [IPC_LOCK]
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
+  # ---------------------------------------------------------------------------
   db:
-    image: postgres:16
-    # TODO: pgvector-enabled image or init; password from Vault-seeded value
+    # ankane/pgvector ships postgres:16 + the vector extension pre-installed
+    image: ankane/pgvector:v0.5.1
+    environment:
+      POSTGRES_DB: "${DB_NAME:-copilot}"
+      POSTGRES_USER: "${DB_USER:-copilot}"
+      # password bootstrapped from Vault by the `migrate` container; this is
+      # only used to initialise the instance on first run
+      POSTGRES_PASSWORD: "${POSTGRES_INIT_PASSWORD:-change-me-for-dev}"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-copilot} -d ${DB_NAME:-copilot}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
+  # ---------------------------------------------------------------------------
   redis:
-    image: redis:7
-    # short-term memory + cache
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
+  # ---------------------------------------------------------------------------
   minio:
-    image: minio/minio
-    # blob: model artifacts, eval_report.json, training plots, chunk snapshots
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_SECRET_KEY:-minioadmin}"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
+  # ---------------------------------------------------------------------------
+  # Runs `alembic upgrade head` once then exits with code 0.
+  # All downstream services depend on this completing successfully.
   migrate:
-    build: { context: ., dockerfile: docker/migrate.Dockerfile }
-    # runs `alembic upgrade head` then exits; api waits for completion
-    depends_on: [db, vault]
+    build:
+      context: .
+      dockerfile: docker/migrate.Dockerfile
+    environment:
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_DEV_ROOT_TOKEN: "${VAULT_DEV_ROOT_TOKEN}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: "${DB_NAME:-copilot}"
+    depends_on:
+      db:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
 
+  # ---------------------------------------------------------------------------
   modelserver:
-    build: { context: ., dockerfile: docker/modelserver.Dockerfile }
-    # refuses to boot if classifier weights missing / SHA mismatch
-    depends_on: [vault, minio]
+    build:
+      context: .
+      dockerfile: docker/modelserver.Dockerfile
+    environment:
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_DEV_ROOT_TOKEN: "${VAULT_DEV_ROOT_TOKEN}"
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT:-minio:9000}"
+    ports:
+      - "${MODELSERVER_PORT:-8001}:8001"
+    depends_on:
+      vault:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
 
+  # ---------------------------------------------------------------------------
   api:
-    build: { context: ., dockerfile: docker/api.Dockerfile }
-    # refuses to boot if Vault down / weights bad / tracing bad / threshold 0
-    depends_on: [migrate, vault, db, redis, minio, modelserver]
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_DEV_ROOT_TOKEN: "${VAULT_DEV_ROOT_TOKEN}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: "${DB_NAME:-copilot}"
+      REDIS_HOST: "${REDIS_HOST:-redis}"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT:-minio:9000}"
+      MODELSERVER_URL: "http://modelserver:8001"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      vault:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      modelserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
 
+  # ---------------------------------------------------------------------------
   chatbot:
-    build: { context: ., dockerfile: docker/chatbot.Dockerfile }
-    depends_on: [api]
+    build:
+      context: .
+      dockerfile: docker/chatbot.Dockerfile
+    environment:
+      API_BASE_URL: "http://api:8000"
+    ports:
+      - "${CHATBOT_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
 
+  # ---------------------------------------------------------------------------
   widget:
-    build: { context: ., dockerfile: docker/widget.Dockerfile }
-    # serves the React bundle + /widget.js loader
+    build:
+      context: .
+      dockerfile: docker/widget.Dockerfile
+    ports:
+      - "${WIDGET_PORT:-8080}:8080"
 
+  # ---------------------------------------------------------------------------
+  # Demo host page on a distinct origin — proves the allowlist is real
   host:
-    build: { context: ., dockerfile: docker/host.Dockerfile }
-    # demo host page embedding the widget (distinct origin)
-    depends_on: [widget]
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+    ports:
+      - "${HOST_DEMO_PORT:-8090}:80"
+    depends_on:
+      - widget
 
-# TODO: volumes (db, minio), networks, healthchecks, port mappings from .env
+# =============================================================================
+volumes:
+  db_data:
+  redis_data:
+  minio_data:
+
+networks:
+  default:
+    name: copilot_net
