@@ -42,11 +42,13 @@ modelserver = ["torch", "transformers", "spacy"]
 # Installed only in training jobs (DL track) — not in any runtime container.
 ml = ["torch", "transformers", "datasets", "scikit-learn", "mlflow", "pandas"]
 # RAG offline indexing + retrieval.
-rag = ["sentence-transformers", "rank-bm25"]
+rag = ["sentence-transformers", "rank-bm25", "google-genai", "anthropic"]
 # Streamlit internal tool image.
 chatbot = ["streamlit"]
 # Eval harness.
-evals = ["ragas", "pandas"]
+evals = ["ragas", "pandas", "datasets"]
+# LLM providers (api + rag_service runtime).
+llm = ["google-genai", "anthropic"]
 # Dev / CI.
 dev = ["ruff", "mypy", "pytest", "pytest-asyncio"]
 

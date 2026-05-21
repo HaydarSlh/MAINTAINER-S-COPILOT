@@ -27,6 +27,7 @@ class Conversation(BaseModel):
 class Classification(BaseModel):
     label: IssueLabel
     confidence: float
+    fallback_used: bool = False   # True when LLM fallback fired due to low DL confidence
 
 
 class MemoryRecord(BaseModel):

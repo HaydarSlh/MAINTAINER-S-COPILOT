@@ -86,19 +86,136 @@ Bug/feature/docs golden examples require ≥0.80 model confidence. Question exam
 | LLM baseline | _ | _ | _ | _ | _ |
 - **Deployment choice:** _TBD — because (one line)_
 
+### Low-confidence fallback (classifier)
+When the fine-tuned model's top-class probability falls below a per-class threshold,
+classification falls back to the LLM baseline (Gemini 2.5 Flash, same prompt as Section 9
+of the training notebook). This is particularly important for the `question` class where
+test F1 = 0.087 and the model boundary with `bug` is structurally ambiguous.
+
+**Fallback thresholds (same as golden-set confidence floors):**
+
+| Class | DL confidence threshold | Rationale |
+|-------|------------------------|-----------|
+| bug | 0.60 | High-confidence class; only fall back on genuine uncertainty |
+| feature | 0.60 | High-confidence class |
+| docs | 0.60 | High-confidence class |
+| question | 0.50 | Lower threshold — model is unreliable here; cast wider net to LLM |
+
+**Result field:** `Classification.fallback_used: bool` so callers know which path fired.
+**Why not always use LLM:** latency (~1–2s vs ~10ms), API cost, and the DL model is
+correct >87% of the time on bug/feature/docs. The fallback fires only on the tail.
+
 ## D4 — Embedding model
-- **Chosen:** _TBD_ vs alternative _TBD_
-- **Retrieval-quality number on golden set:** _TBD_
+- **Candidates:** `sentence-transformers/all-MiniLM-L6-v2` (384-dim, general purpose)
+  vs `sentence-transformers/multi-qa-mpnet-base-dot-v1` (768-dim, trained for Q→passage retrieval)
+- **Metric:** hit@5 and MRR@10 on RAG golden set (25 triples), using structure-aware chunks
+  and pure dense retrieval (hybrid added in D6 to isolate the embedding effect)
+- **Result:** _TBD after rag/experiments.py Section 5_
+- **Choice:** _TBD — expected: multi-qa-mpnet wins because it is trained for the exact
+  question-to-passage task; MiniLM is a fallback if latency is a constraint_
 
 ## D5 — Chunking strategy (not naive fixed-size)
-- **Strategy:** _TBD_, with golden-set number vs the naive baseline.
+
+### Corpus structure
+Two document types with different natural granularity:
+- **Pydantic docs** (~60 markdown files): structured with `##`/`###` headers, code blocks,
+  Material for MkDocs admonitions (`!!!`, `???`). Each `##` section is a complete semantic
+  unit (e.g. "Field validators", "Model validators", "Raising validation errors").
+- **Resolved Q&A issues** (~300 held-out issues): title + body + top maintainer reply.
+  Already a natural semantic unit — no further splitting needed.
+
+### What we compared
+
+| Strategy | Description |
+|----------|-------------|
+| **Baseline** | Fixed-size 512 tokens, 50-token overlap — splits mid-sentence, breaks code examples |
+| **Candidate** | Structure-aware: split docs on `##` headers (keep header as chunk prefix); whole-issue for Q&A |
+
+- **Why structure-aware beats fixed-size here:** pydantic docs have high code-example density.
+  A fixed cut mid-example gives a chunk with dangling code that has no semantic meaning alone.
+  Structure-aware chunks keep explanation + code example + API reference together.
+- **Naive baseline number (hit@5):** _TBD_
+- **Structure-aware number (hit@5):** _TBD_
+
+### Techniques considered and rejected
+
+| Technique | Why rejected |
+|-----------|-------------|
+| Parent-document retrieval | Structure-aware chunks are already full sections (200–600 tokens). Parent-doc helps when chunks are tiny (50–100 tokens). Not needed here. |
+| Sliding window with overlap | Overlap helps fixed-size chunking but adds duplicate content to the index. Structure-aware has no boundary problem to solve. |
+| Semantic chunking (embedding-based splits) | More expensive, no clear gain when document structure already defines good boundaries. |
 
 ## D6 — Hybrid retrieval weighting
-- **Sparse+dense weighting:** _TBD (tuned value + number)_
+
+### What we compared
+
+| Strategy | Description |
+|----------|-------------|
+| **Baseline** | Pure dense (bi-encoder vector search only) |
+| **Candidate** | Hybrid: BM25 sparse + dense, combined as `α × dense + (1−α) × BM25` |
+
+- **Why hybrid matters for this corpus:** pydantic issues have very high identifier density —
+  exact class names (`BaseModel`, `model_validate`), error types (`ValidationError`),
+  decorator names (`@field_validator`). BM25 exact-matches these perfectly; dense vectors
+  sometimes miss exact tokens. Hybrid captures both.
+- **Alpha tuning:** tested α ∈ {0.3, 0.5, 0.7} on the golden set; picked the best.
+- **Best alpha:** _TBD_
+- **Pure dense hit@5:** _TBD_ | **Hybrid hit@5:** _TBD_
+
+### Techniques considered and rejected
+
+| Technique | Why rejected |
+|-----------|-------------|
+| Pure BM25 only | Misses semantic paraphrases — "validate data" vs "use validators". Dense is needed. |
+| Learned sparse (SPLADE) | Requires a separate model, more complex infra. BM25 is sufficient at this corpus size. |
 
 ## D7 — Reranking & query transformation
-- **Cross-encoder:** _TBD_
-- **Query transformation technique:** _TBD_
+
+### D7a — Cross-encoder reranking
+
+| Setup | Description |
+|-------|-------------|
+| **Baseline** | Hybrid k=5, take top-5 as-is |
+| **Candidate** | Hybrid k=20, rerank with `cross-encoder/ms-marco-MiniLM-L-6-v2`, take top-5 |
+
+- **Why cross-encoder over bi-encoder for reranking:** bi-encoder embeds query and passage
+  independently; cross-encoder sees both together and scores relevance jointly — much more
+  accurate but too slow for first-stage retrieval over thousands of chunks.
+- **Why ms-marco-MiniLM-L-6-v2:** local (no API), runs fast on CPU (20 candidates ~50ms),
+  trained on MS-MARCO passage relevance which transfers well to Q&A over technical docs.
+- **Baseline hit@5:** _TBD_ | **With reranking hit@5:** _TBD_
+
+### Techniques considered and rejected for reranking
+
+| Technique | Why rejected |
+|-----------|-------------|
+| Cohere reranker API | External API dependency, per-call cost, latency add. Local model is sufficient. |
+| ColBERT | Requires a dedicated ColBERT server (dedicated GPU or large RAM). Overkill for this corpus size. |
+
+### D7b — Query transformation
+
+Tested one at a time on top of the best pipeline from D7a:
+
+| Technique | How it works | When it helps |
+|-----------|-------------|---------------|
+| **None (baseline)** | Raw question sent directly to retrieval | — |
+| **Multi-query** | LLM generates 3 paraphrases; retrieve for each; deduplicate | Vocab mismatch between how maintainers phrase questions and how docs are written |
+| **HyDE** | LLM generates a hypothetical answer; embed that instead of the question | Question and answer are phrased very differently (question is problem-shaped, docs are solution-shaped) |
+| **Step-back** | LLM abstracts the question first ("why does X fail?" → "how does pydantic validation work?") then retrieves | Conceptual "why" questions that need background context |
+
+- **Multi-query hit@5:** _TBD_
+- **HyDE hit@5:** _TBD_
+- **Step-back hit@5:** _TBD_
+- **Chosen technique:** _TBD — pick highest; stack multi-query + step-back if complementary_
+
+### Techniques considered and rejected for query transformation
+
+| Technique | Why rejected |
+|-----------|-------------|
+| Decomposition | Most maintainer questions are single-hop. Measured first — only add if hit@5 still below threshold after D7b. |
+| Agentic RAG (retrieval as tool) | Pipeline shape is fixed by the brief. Full agentic routing adds latency and complexity beyond project scope. |
+| GraphRAG | Pydantic docs do not have a deep entity relationship graph (it is a library reference, not a knowledge base). Community summary approach also unnecessary at this corpus size. |
+| Routing | Only one corpus type (docs + issues); no routing decision to make. |
 
 ## D8 — Long-term memory type
 - **Choice (episodic | semantic | procedural):** _TBD + defense_
@@ -110,10 +227,37 @@ Bug/feature/docs golden examples require ≥0.80 model confidence. Question exam
 - **pgvector vs Qdrant:** _TBD + defense_
 
 ## D11 — RAG eval methodology
-- **RAGAS vs frozen judge:** _TBD_; human/judge agreement on 5 hand-labeled.
+- **Method:** RAGAS with Gemini 2.5 Flash as the frozen judge for faithfulness and
+  answer_relevancy. Human labels on 5 of 25 golden examples to report judge agreement.
+- **Why RAGAS over a custom judge:** RAGAS provides reproducible, decomposed metrics
+  (faithfulness separates "did the answer hallucinate" from "was the answer relevant").
+  A custom prompt judge collapses these into one score, making debugging harder.
+- **Human/judge agreement:** _TBD after hand-labeling 5 examples_
+- **Faithfulness:** _TBD_ | **Answer relevancy:** _TBD_
 
 ## D12 — LLM provider + model
-- **Choice:** _TBD_
+- **Primary:** Gemini 2.5 Flash (`gemini-2.5-flash`) via `google-genai` SDK.
+  API key stored in Vault at `secret/llm.api_key`.
+- **Backup:** Anthropic Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) via `anthropic` SDK.
+  API key stored in Vault at `secret/llm.anthropic_api_key`.
+- **Fallback logic:** if Gemini returns 503/429 after backoff exhaustion, the LLM adapter
+  automatically retries the same call on Claude Haiku. The caller sees a transparent result
+  with `provider` field indicating which model answered.
+- **Why Gemini as primary:** already integrated in training notebook, low cost, fast (~1s
+  for classification prompts). Haiku is the backup because it is comparably fast and cheap,
+  and Anthropic and Google outages are unlikely to overlap.
+- **Why not GPT-4o as backup:** adds a third API key to manage in Vault with no quality
+  advantage for this use case.
 
 ## D13 — Short-term memory TTL
-- **TTL value + justification + boundary behavior:** _TBD_
+- **TTL value:** 1800 seconds (30 minutes)
+- **Justification:** Long enough to cover a focused issue-triage session without
+  leaving stale context if the maintainer closes the tab and returns the next day.
+  A typical triage session (read issue, classify, search docs, write response) takes
+  5–15 minutes. 30 minutes gives comfortable headroom without persisting context
+  into the next working day.
+- **Boundary behavior:** on TTL expiry the Redis key is deleted. The next message
+  from the user starts a fresh context window. The chat service checks for a None
+  return from `get_short_term()` and informs the user their session expired —
+  it does NOT silently continue with a missing context (that would produce
+  confused responses). Long-term memory (pgvector) is unaffected by the TTL.
