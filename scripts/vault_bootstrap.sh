@@ -32,7 +32,8 @@ vault kv put secret/jwt \
 
 echo "→ Writing secret/llm ..."
 vault kv put secret/llm \
-    api_key="${GOOGLE_API_KEY:?GOOGLE_API_KEY must be set}"
+    api_key="${GOOGLE_API_KEY:?GOOGLE_API_KEY must be set}" \
+    anthropic_api_key="${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set}"
 
 echo "→ Writing secret/tracing ..."
 vault kv put secret/tracing \

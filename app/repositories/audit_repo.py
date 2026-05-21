@@ -1,8 +1,37 @@
-"""Audit-log persistence. SQL only.
+"""Audit-log persistence. SQL only. Append-only — never updated or deleted."""
 
-Per the brief, an audit-log row (actor, action, target, timestamp) is written
-for: role changes, memory writes, widget config changes, conversation
-deletions. Append-only; never updated or deleted.
-"""
+from __future__ import annotations
 
-# TODO: append(actor, action, target, timestamp), list(filters)
+import uuid
+from datetime import datetime
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.orm import AuditLogORM
+
+
+async def append(session: AsyncSession, actor_id: str | None,
+                  action: str, target_type: str | None = None,
+                  target_id: str | None = None,
+                  detail: dict | None = None) -> AuditLogORM:
+    row = AuditLogORM(
+        id=uuid.uuid4(),
+        actor_id=uuid.UUID(actor_id) if actor_id else None,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        detail=detail or {},
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def list_recent(session: AsyncSession, limit: int = 100,
+                       actor_id: str | None = None) -> list[AuditLogORM]:
+    q = select(AuditLogORM).order_by(AuditLogORM.created_at.desc()).limit(limit)
+    if actor_id:
+        q = q.where(AuditLogORM.actor_id == uuid.UUID(actor_id))
+    result = await session.execute(q)
+    return list(result.scalars().all())
