@@ -32,6 +32,8 @@ dependencies = [
     "fastapi-users[sqlalchemy]",
     "httpx",                # calls to modelserver + LLM provider
     "pyyaml",               # eval_thresholds.yaml
+    "bcrypt",               # password hashing in auth_service
+    "pyjwt",                # JWT encode/decode in auth_service
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp-proto-grpc",
 ]
@@ -44,7 +46,7 @@ ml = ["torch", "transformers", "datasets", "scikit-learn", "mlflow", "pandas"]
 # RAG offline indexing + retrieval.
 rag = ["sentence-transformers", "rank-bm25", "google-genai", "anthropic"]
 # Streamlit internal tool image.
-chatbot = ["streamlit"]
+chatbot = ["streamlit", "httpx", "pandas"]
 # Eval harness.
 evals = ["ragas", "pandas", "datasets"]
 # LLM providers (api + rag_service runtime).

@@ -1,16 +1,39 @@
 <!doctype html>
-<!-- The demo HOST app (the `host` compose service, nginx). A plain page that
-     embeds the widget with the single loader <script> tag. Friday demo: show
-     it loading on this allowed origin, then blocked on a non-allowlisted one
-     (CSP frame-ancestors), using real browser network + console output. -->
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Demo Host — embeds the Maintainer's Copilot widget</title>
-  </head>
-  <body>
-    <h1>Pretend host application</h1>
-    <!-- TODO: paste the real loader tag with a valid data-widget-id -->
-    <!-- <script src="http://localhost:8080/widget.js" data-widget-id="..."></script> -->
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo Host — Maintainer's Copilot</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 60px auto; padding: 0 24px; }
+    h1 { color: #1f2937; }
+    .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px;
+             background:#d1fae5; color:#065f46; font-weight:600; }
+    code { background:#f3f4f6; padding:2px 6px; border-radius:4px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <h1>Pydantic Maintainer Hub</h1>
+  <p><span class="badge">DEMO</span> This page lives on a <strong>distinct origin</strong>
+  from the widget service (port 8090 vs 8080) to prove the allowlist is real.</p>
+  <p>The Maintainer's Copilot widget appears in the bottom-right corner. It loads
+  only because <code>http://localhost:8090</code> is in this widget's
+  <code>allowed_origins</code> list. Change the origin in the widget admin and the
+  embed will be blocked by the <code>Content-Security-Policy: frame-ancestors</code>
+  header the api sets.</p>
+  <hr />
+  <h2>How the allowlist works</h2>
+  <ol>
+    <li>Admin creates a widget config via the Streamlit admin page, setting
+        <code>allowed_origins: ["http://localhost:8090"]</code>.</li>
+    <li>Host page pastes the <code>&lt;script&gt;</code> snippet.</li>
+    <li>Loader injects an <code>&lt;iframe&gt;</code> pointing at the widget service.</li>
+    <li>Widget fetches <code>/embed/config/{id}</code> from the api; the response carries
+        <code>Content-Security-Policy: frame-ancestors http://localhost:8090</code>.</li>
+    <li>If this page's origin is not in the list, the browser blocks the iframe.</li>
+  </ol>
+
+  <!-- Widget injected here by loader — replace WIDGET_ID at deploy time -->
+  <script src="http://localhost:8080/widget.js" data-widget-id="REPLACE_WITH_WIDGET_ID" async></script>
+</body>
 </html>
