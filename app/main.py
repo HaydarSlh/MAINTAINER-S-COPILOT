@@ -84,14 +84,15 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
-    # Routers mounted here as they are implemented
+    # Routers mounted here as they are implemented.
+    # No prefix — each router declares its own full paths (e.g. /auth/login).
     from app.api.routers import auth, chat, memory, rag, widgets, embed
-    app.include_router(auth.router, prefix="/auth", tags=["auth"])
-    app.include_router(chat.router, prefix="/chat", tags=["chat"])
-    app.include_router(memory.router, prefix="/memory", tags=["memory"])
-    app.include_router(rag.router, prefix="/rag", tags=["rag"])
-    app.include_router(widgets.router, prefix="/widgets", tags=["widgets"])
-    app.include_router(embed.router, tags=["embed"])
+    app.include_router(auth.router)
+    app.include_router(chat.router)
+    app.include_router(memory.router)
+    app.include_router(rag.router)
+    app.include_router(widgets.router)
+    app.include_router(embed.router)
 
     return app
 
