@@ -266,14 +266,14 @@ def main() -> None:
     thresholds = _load_thresholds()
     print(f"Golden set: {len(examples)} examples")
 
-    print(f"\n── Retrieval (transform={args.transform}) ──")
+    print(f"\n-- Retrieval (transform={args.transform}) --")
     retrieval = eval_retrieval(examples, transform=args.transform)
     print(f"  hit@5   = {retrieval['hit_at_5']:.4f}")
     print(f"  MRR@10  = {retrieval['mrr_at_10']:.4f}")
 
     generation = {"skipped": True, "faithfulness": 0.0, "answer_relevancy": 0.0, "n": 0}
     if not args.no_generation:
-        print("\n── Generation (RAGAS) ──")
+        print("\n-- Generation (RAGAS) --")
         generation = eval_generation(examples)
         print(f"  faithfulness     = {generation['faithfulness']:.4f}")
         print(f"  answer_relevancy = {generation['answer_relevancy']:.4f}")

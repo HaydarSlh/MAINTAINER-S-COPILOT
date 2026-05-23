@@ -59,10 +59,15 @@ def _get_tracer() -> trace.Tracer:
 def span(name: str, attributes: dict | None = None):
     """Context manager that wraps a block in an OTEL span.
 
-    Caller is responsible for passing only redacted attributes.
+    Falls back to a no-op span when tracing is not initialised (e.g. offline
+    eval runs without Jaeger). Caller is responsible for passing only
+    redacted attributes.
     """
-    tracer = _get_tracer()
-    with tracer.start_as_current_span(name) as s:
+    if _tracer is None:
+        # No-op span — yields a dummy object that ignores set_attribute calls
+        yield type("_NoOpSpan", (), {"set_attribute": lambda self, k, v: None})()
+        return
+    with _tracer.start_as_current_span(name) as s:
         if attributes:
             for k, v in attributes.items():
                 s.set_attribute(k, v)

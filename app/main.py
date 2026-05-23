@@ -113,13 +113,54 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _load_rag_index() -> None:
-        """Build the hybrid RAG index from corpus.jsonl on startup."""
+        """Build the hybrid RAG index from corpus.jsonl on startup.
+
+        Embeddings are cached to /tmp/rag_vectors.npy so restarts skip
+        the ~2-minute re-embedding step. Delete the file to force a rebuild.
+        """
+        import numpy as np
         corpus = Path(__file__).parent.parent / "corpus.jsonl"
         if not corpus.exists():
             print(f"WARN: RAG corpus not found at {corpus} — search_docs tool will fail")
             return
-        from rag.index import load_index
-        load_index(str(corpus), use_pgvector=False)
+
+        cache_path = Path("/tmp/rag_vectors.npy")
+        from rag.chunking import chunk_corpus
+        from rag.index import HybridIndex, _RERANKER, get_reranker
+        import rag.index as _rag_index
+        import json
+
+        docs = []
+        with open(corpus, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    docs.append(json.loads(line))
+
+        chunks = chunk_corpus(docs, strategy="structure")
+
+        if cache_path.exists():
+            print("RAG index: loading cached embeddings from /tmp/rag_vectors.npy ...")
+            from rag.embed import get_embedder, DEFAULT_MODEL
+            from rag.index import BM25Index, DenseIndex
+            import numpy as np
+            vectors = np.load(str(cache_path))
+            dense = DenseIndex(chunks)
+            dense._vectors = vectors
+            idx = HybridIndex.__new__(HybridIndex)
+            idx._chunks = chunks
+            idx.alpha = 0.6
+            idx._dense = dense
+            idx._bm25 = BM25Index(chunks)
+            _rag_index._INDEX = idx
+        else:
+            print("RAG index: embedding 918 chunks (first boot — will cache) ...")
+            from rag.index import load_index
+            idx = load_index(str(corpus), use_pgvector=False)
+            if idx._dense._vectors is not None:
+                np.save(str(cache_path), idx._dense._vectors)
+                print("RAG index: embeddings cached to /tmp/rag_vectors.npy")
+
         print(f"RAG index loaded from {corpus}")
 
     return app

@@ -7,8 +7,8 @@
     "alpha": 0.6,
     "transform": "none",
     "no_gate": false,
-    "no_generation": true,
-    "out": "eval_report_rag.json"
+    "no_generation": false,
+    "out": "C:\\AIE bootcamp\\MAINTAINER'S COPILOT\\eval_report_rag.json"
   },
   "retrieval": {
     "n": 25,
@@ -17,11 +17,14 @@
     "transform": "none"
   },
   "generation": {
-    "skipped": true,
     "faithfulness": 0.0,
     "answer_relevancy": 0.0,
-    "n": 0
+    "n": 25,
+    "error": "No module named 'ragas'"
   },
-  "gate_failures": [],
-  "passed": true
+  "gate_failures": [
+    "faithfulness 0.0000 < threshold 0.75",
+    "answer_relevancy 0.0000 < threshold 0.75"
+  ],
+  "passed": false
 }
