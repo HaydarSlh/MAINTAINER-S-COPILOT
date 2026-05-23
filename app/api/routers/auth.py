@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr
 from app.api.deps import get_current_user
 from app.domain.models import User
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class RegisterRequest(BaseModel):

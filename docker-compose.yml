@@ -16,6 +16,15 @@
 services:
 
   # ---------------------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC receiver
+
+  # ---------------------------------------------------------------------------
   vault:
     image: hashicorp/vault:1.16
     environment:
@@ -117,7 +126,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -153,7 +162,7 @@ services:
       modelserver:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 15

@@ -17,13 +17,16 @@ import re
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # OpenAI / generic sk- keys
     (re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"), "[REDACTED:API_KEY]"),
-    # Google AI / Gemini keys (AIza prefix, 39 chars total)
-    (re.compile(r"\bAIza[A-Za-z0-9_\-]{35}\b"), "[REDACTED:GOOGLE_KEY]"),
+    # Google AI / Gemini keys (AIza prefix, variable length)
+    (re.compile(r"\bAIza[A-Za-z0-9_\-]{10,}\b"), "[REDACTED:GOOGLE_KEY]"),
     # Anthropic keys
     (re.compile(r"\bsk-ant-[A-Za-z0-9\-_]{40,}\b"), "[REDACTED:ANTHROPIC_KEY]"),
+    # Grok / xAI keys (gsk_ prefix)
+    (re.compile(r"\bgsk_[A-Za-z0-9\-_]{20,}\b"), "[REDACTED:GROK_KEY]"),
     # GitHub tokens: classic (ghp_), OAuth (gho_), fine-grained (github_pat_)
-    (re.compile(r"\bgh[po]_[A-Za-z0-9]{36,}\b"), "[REDACTED:GITHUB_TOKEN]"),
-    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{82}\b"), "[REDACTED:GITHUB_TOKEN]"),
+    (re.compile(r"\bghp_[A-Za-z0-9]{10,}\b"), "[REDACTED:GITHUB_TOKEN]"),
+    (re.compile(r"\bgho_[A-Za-z0-9]{10,}\b"), "[REDACTED:GITHUB_TOKEN]"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{10,}\b"), "[REDACTED:GITHUB_TOKEN]"),
     # AWS access key IDs
     (re.compile(r"\bAKIA[A-Z0-9]{16}\b"), "[REDACTED:AWS_KEY]"),
     # JWT Bearer tokens in Authorization headers

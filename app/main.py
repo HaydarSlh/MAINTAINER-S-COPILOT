@@ -94,6 +94,17 @@ def create_app() -> FastAPI:
     app.include_router(widgets.router)
     app.include_router(embed.router)
 
+    @app.on_event("startup")
+    async def _load_rag_index() -> None:
+        """Build the hybrid RAG index from corpus.jsonl on startup."""
+        corpus = Path(__file__).parent.parent / "corpus.jsonl"
+        if not corpus.exists():
+            print(f"WARN: RAG corpus not found at {corpus} — search_docs tool will fail")
+            return
+        from rag.index import load_index
+        load_index(str(corpus), use_pgvector=False)
+        print(f"RAG index loaded from {corpus}")
+
     return app
 
 

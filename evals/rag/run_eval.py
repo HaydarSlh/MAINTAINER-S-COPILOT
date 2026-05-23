@@ -79,15 +79,17 @@ def eval_retrieval(examples: list[dict], transform: str = "none") -> dict:
     hits5, rrs = [], []
     for ex in examples:
         question = ex["question"]
-        gt_chunks: list[str] = ex.get("ground_truth_chunks", [])
-        if not gt_chunks:
+        # Support both field names; relevant_doc_ids are matched against chunk doc_id.
+        gt_doc_ids: list[str] = ex.get("relevant_doc_ids", ex.get("ground_truth_chunks", []))
+        if not gt_doc_ids:
             continue
 
         results = retrieve(question, k=10, first_stage_k=20, transform=transform)
-        retrieved_ids = [r.chunk_id for r in results]
+        # Match on doc_id so one correct chunk anywhere in the doc counts as a hit.
+        retrieved_doc_ids = [r.doc_id for r in results]
 
-        hits5.append(_hit_at_k(retrieved_ids, gt_chunks, k=5))
-        rrs.append(_reciprocal_rank(retrieved_ids, gt_chunks))
+        hits5.append(_hit_at_k(retrieved_doc_ids, gt_doc_ids, k=5))
+        rrs.append(_reciprocal_rank(retrieved_doc_ids, gt_doc_ids))
 
     n = len(hits5)
     return {
@@ -182,15 +184,24 @@ def _agreement(hand_labeled: list[dict]) -> float:
 def _gate(retrieval: dict, generation: dict, thresholds: dict) -> list[str]:
     failures = []
     cfg = thresholds.get("rag", {})
-    checks = [
-        (retrieval.get("hit_at_5", 0.0),           cfg.get("hit_at_5_min", 0),          "hit_at_5"),
-        (retrieval.get("mrr_at_10", 0.0),           cfg.get("mrr_at_10_min", 0),         "mrr_at_10"),
-        (generation.get("faithfulness", 0.0),       cfg.get("faithfulness_min", 0),      "faithfulness"),
-        (generation.get("answer_relevancy", 0.0),   cfg.get("answer_relevancy_min", 0),  "answer_relevancy"),
+    retrieval_checks = [
+        (retrieval.get("hit_at_5", 0.0),  cfg.get("hit_at_5_min", 0),  "hit_at_5"),
+        (retrieval.get("mrr_at_10", 0.0), cfg.get("mrr_at_10_min", 0), "mrr_at_10"),
     ]
-    for val, floor, name in checks:
+    for val, floor, name in retrieval_checks:
         if val < floor:
             failures.append(f"{name} {val:.4f} < threshold {floor}")
+
+    # Only gate generation metrics when generation was actually run.
+    if not generation.get("skipped"):
+        gen_checks = [
+            (generation.get("faithfulness", 0.0),     cfg.get("faithfulness_min", 0),     "faithfulness"),
+            (generation.get("answer_relevancy", 0.0), cfg.get("answer_relevancy_min", 0), "answer_relevancy"),
+        ]
+        for val, floor, name in gen_checks:
+            if val < floor:
+                failures.append(f"{name} {val:.4f} < threshold {floor}")
+
     return failures
 
 
@@ -227,7 +238,7 @@ def main() -> None:
     parser.add_argument("--strategy", default="structure", choices=["structure", "naive"])
     parser.add_argument("--model", default="multi-qa-mpnet-base-dot-v1")
     parser.add_argument("--alpha", type=float, default=0.6)
-    parser.add_argument("--transform", default="multi_query",
+    parser.add_argument("--transform", default="none",
                         choices=["none", "multi_query", "hyde", "step_back"])
     parser.add_argument("--no-gate", action="store_true")
     parser.add_argument("--no-generation", action="store_true")

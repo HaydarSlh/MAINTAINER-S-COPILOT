@@ -1,0 +1,95 @@
+{
+  "golden_set_size": 23,
+  "models": {
+    "finetuned": {
+      "macro_f1": 1.0,
+      "per_class_f1": {
+        "bug": 1.0,
+        "feature": 1.0,
+        "docs": 1.0,
+        "question": 1.0
+      },
+      "confusion_matrix": {
+        "labels": [
+          "bug",
+          "feature",
+          "docs",
+          "question"
+        ],
+        "matrix": [
+          [
+            7,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            7,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            7,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2
+          ]
+        ]
+      },
+      "n": 23
+    },
+    "classical": {
+      "macro_f1": 0.6475,
+      "per_class_f1": {
+        "bug": 0.9333,
+        "feature": 0.8235,
+        "docs": 0.8333,
+        "question": 0.0
+      },
+      "confusion_matrix": {
+        "labels": [
+          "bug",
+          "feature",
+          "docs",
+          "question"
+        ],
+        "matrix": [
+          [
+            7,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            7,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            5,
+            0
+          ],
+          [
+            0,
+            2,
+            0,
+            0
+          ]
+        ]
+      },
+      "n": 23
+    }
+  },
+  "gate_failures": [],
+  "passed": true
+}

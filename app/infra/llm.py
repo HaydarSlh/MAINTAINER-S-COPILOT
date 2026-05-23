@@ -1,7 +1,7 @@
-"""LLM provider adapter — Gemini primary, Claude Haiku backup.
+"""LLM provider adapter — Gemini primary, Grok backup.
 
 The chatbot is ONE tool-calling LLM. This adapter wraps both providers,
-tries Gemini first, falls back to Claude Haiku if Gemini exhausts retries.
+tries Gemini first, falls back to Grok (xAI) if Gemini exhausts retries.
 API keys come from Vault (never from env in production).
 Provider/model choice recorded in DECISIONS.md D12.
 
@@ -20,7 +20,7 @@ from app.infra.tracing import span as trace_span
 
 # ── Model IDs ─────────────────────────────────────────────────────────────────
 GEMINI_MODEL  = "gemini-2.5-flash"
-HAIKU_MODEL   = "claude-haiku-4-5-20251001"
+GROK_MODEL    = "grok-3-mini"
 
 # Transient error codes that warrant a retry / fallback
 _TRANSIENT = ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded")
@@ -51,15 +51,15 @@ def _gemini_key() -> str:
     return os.environ.get("GOOGLE_API_KEY", "")
 
 
-def _anthropic_key() -> str:
+def _grok_key() -> str:
     try:
         from app.infra.vault import read_secret
-        key = read_secret("secret/data/llm").get("anthropic_api_key", "")
+        key = read_secret("secret/data/llm").get("grok_api_key", "")
         if key:
             return key
     except Exception:
         pass
-    return os.environ.get("ANTHROPIC_API_KEY", "")
+    return os.environ.get("GROK_API_KEY", "")
 
 
 # ── Gemini call ────────────────────────────────────────────────────────────────
@@ -159,74 +159,60 @@ def _extract_gemini_tool_calls(resp) -> list[dict]:
     return calls
 
 
-# ── Claude Haiku call ──────────────────────────────────────────────────────────
+# ── Grok call (OpenAI-compatible) ─────────────────────────────────────────────
 
-def _call_claude(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
-    import anthropic
+def _call_grok(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
+    from openai import OpenAI
 
-    key = _anthropic_key()
+    key = _grok_key()
     if not key:
-        raise RuntimeError("Anthropic API key not available")
+        raise RuntimeError("Grok API key not available")
 
-    client = anthropic.Anthropic(api_key=key)
-
-    system = next((m["content"] for m in messages if m.get("role") == "system"), None)
-    claude_messages = [m for m in messages if m.get("role") != "system"]
+    client = OpenAI(api_key=key, base_url="https://api.x.ai/v1")
 
     kwargs: dict[str, Any] = dict(
-        model=HAIKU_MODEL,
+        model=GROK_MODEL,
         max_tokens=2048,
-        messages=claude_messages,
+        messages=messages,
     )
-    if system:
-        kwargs["system"] = system
     if tools:
-        kwargs["tools"] = _tools_to_claude(tools)
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
 
     delay = 4
     last_exc: Exception | None = None
     for attempt in range(_MAX_RETRIES):
         try:
-            resp = client.messages.create(**kwargs)
-            text = ""
+            resp = client.chat.completions.create(**kwargs)
+            msg = resp.choices[0].message
+            text = msg.content or ""
             tool_calls = []
-            for block in resp.content:
-                if block.type == "text":
-                    text += block.text
-                elif block.type == "tool_use":
-                    tool_calls.append({"name": block.name, "arguments": block.input or {}})
+            if msg.tool_calls:
+                for tc in msg.tool_calls:
+                    import json
+                    tool_calls.append({
+                        "name": tc.function.name,
+                        "arguments": json.loads(tc.function.arguments or "{}"),
+                    })
             return LLMResponse(
                 content=text,
-                provider="claude",
-                model=HAIKU_MODEL,
-                input_tokens=resp.usage.input_tokens,
-                output_tokens=resp.usage.output_tokens,
+                provider="grok",
+                model=GROK_MODEL,
+                input_tokens=resp.usage.prompt_tokens if resp.usage else 0,
+                output_tokens=resp.usage.completion_tokens if resp.usage else 0,
                 tool_calls=tool_calls,
             )
         except Exception as e:
             last_exc = e
-            msg = str(e)
-            is_transient = any(code in msg for code in _TRANSIENT)
+            msg_str = str(e)
+            is_transient = any(code in msg_str for code in _TRANSIENT)
             if is_transient and attempt < _MAX_RETRIES - 1:
                 time.sleep(delay)
                 delay = min(delay * 2, 30)
             else:
                 break
 
-    raise RuntimeError(f"Claude failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
-
-
-def _tools_to_claude(tools: list[dict]) -> list[dict]:
-    """Convert OpenAI-style tool schemas to Anthropic tool format."""
-    result = []
-    for t in tools:
-        fn = t.get("function", t)
-        result.append({
-            "name": fn["name"],
-            "description": fn.get("description", ""),
-            "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-        })
-    return result
+    raise RuntimeError(f"Grok failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
 
 
 # ── Public interface ───────────────────────────────────────────────────────────
@@ -263,11 +249,11 @@ def chat(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
                 gemini_err = e
                 s.set_attribute("llm.gemini_error", str(e)[:200])
 
-        # Fall back to Claude Haiku
-        if _anthropic_key():
+        # Fall back to Grok
+        if _grok_key():
             try:
                 t0 = time.monotonic()
-                result = _call_claude(messages, tools)
+                result = _call_grok(messages, tools)
                 latency_ms = int((time.monotonic() - t0) * 1000)
                 s.set_attribute("llm.provider", result.provider)
                 s.set_attribute("llm.model", result.model)
@@ -278,10 +264,10 @@ def chat(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
                 return result
             except Exception as e:
                 raise RuntimeError(
-                    f"Both LLM providers failed. Gemini: {gemini_err}. Claude: {e}"
+                    f"Both LLM providers failed. Gemini: {gemini_err}. Grok: {e}"
                 ) from e
 
         raise RuntimeError(
-            "No LLM API keys available. Set GOOGLE_API_KEY or ANTHROPIC_API_KEY, "
+            "No LLM API keys available. Set GOOGLE_API_KEY or GROK_API_KEY, "
             "or bootstrap Vault with secret/llm."
         )

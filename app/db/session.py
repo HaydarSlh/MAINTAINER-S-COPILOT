@@ -6,6 +6,7 @@ the transaction boundary, the API layer never touches a session.
 """
 
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -45,13 +46,13 @@ def _get_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+@asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency — yields a session, commits on success, rolls back on error."""
+    """Async context manager yielding a session.
+
+    Used as `async with get_session() as session:`. Callers own the transaction
+    boundary via `async with session.begin()`; the session is closed on exit.
+    """
     factory = _get_factory()
     async with factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+        yield session

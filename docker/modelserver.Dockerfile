@@ -7,6 +7,8 @@ WORKDIR /srv
 
 # torch layer is large — install before copying code so Docker cache reuses it
 COPY pyproject.toml README.md ./
+# Install CPU-only torch first to avoid pulling 2 GB of CUDA wheels
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir ".[modelserver]"
 
 COPY modelserver/ modelserver/

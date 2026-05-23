@@ -23,8 +23,8 @@ import numpy as np
 # Default model — override to "all-MiniLM-L6-v2" for the comparison run
 DEFAULT_MODEL = "multi-qa-mpnet-base-dot-v1"
 
-# Batch size for encoding — keeps GPU/CPU memory bounded
-_BATCH_SIZE = 64
+# Batch size for encoding — keep small to avoid OOM on CPU
+_BATCH_SIZE = 16
 
 
 class Embedder(Protocol):
@@ -67,7 +67,7 @@ def embed_texts(texts: list[str], embedder=None,
     vectors = embedder.encode(
         texts,
         batch_size=_BATCH_SIZE,
-        show_progress_bar=len(texts) > 100,
+        show_progress_bar=False,
         normalize_embeddings=True,   # cosine similarity via dot product
     )
     return vectors.astype(np.float32)

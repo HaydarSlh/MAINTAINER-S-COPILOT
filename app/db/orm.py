@@ -37,7 +37,11 @@ class UserORM(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(1024), nullable=False)
-    role: Mapped[str] = mapped_column(Enum(Role, name="role_enum"), nullable=False, default=Role.user)
+    role: Mapped[str] = mapped_column(
+        Enum(Role, name="role_enum", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=Role.USER,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -85,7 +89,10 @@ class MemoryORM(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    memory_type: Mapped[str] = mapped_column(Enum(MemoryType, name="memory_type_enum"), nullable=False)
+    memory_type: Mapped[str] = mapped_column(
+        Enum(MemoryType, name="memory_type_enum", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)

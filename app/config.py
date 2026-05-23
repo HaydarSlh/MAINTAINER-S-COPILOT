@@ -24,8 +24,7 @@ class Settings(BaseSettings):
 
     api_port: int = 8000
 
-    class Config:
-        env_file = ".env"
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()  # imported wherever non-secret config is needed

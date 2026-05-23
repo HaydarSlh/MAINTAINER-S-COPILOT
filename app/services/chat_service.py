@@ -198,8 +198,9 @@ async def handle_message(
         root_span.set_attribute("chat.conversation_id", conversation_id)
 
     # ── 5. Yield for SSE ─────────────────────────────────────────────────────
-    # Yield conversation_id first as a metadata event, then text in chunks
+    # Yield conversation_id first, then the full text in one shot. Streaming
+    # by character/word ranges risks splitting markdown markers (** [] ``)
+    # across SSE events, which breaks the renderer on the client side.
     yield f"[conv:{conversation_id}]"
-    chunk_size = 20
-    for i in range(0, max(len(final_text), 1), chunk_size):
-        yield final_text[i : i + chunk_size]
+    if final_text:
+        yield final_text

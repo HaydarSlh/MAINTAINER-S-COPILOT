@@ -30,7 +30,8 @@ def is_reachable() -> bool:
 
 
 def read_secret(path: str) -> dict:
-    """Read a KV-v2 secret at *path* (e.g. 'secret/data/db').
+    """Read a KV-v2 secret. *path* may be 'db', 'secret/db', or 'secret/data/db' —
+    the mount prefix is stripped so hvac receives only the key name.
 
     Returns the ``data`` dict from the KV-v2 response.
     Raises RuntimeError if Vault is unreachable or the path does not exist.
@@ -40,8 +41,12 @@ def read_secret(path: str) -> dict:
         raise RuntimeError(
             f"Vault is not reachable or token is invalid (addr={settings.vault_addr})"
         )
+    # Strip mount prefix variants so callers can use any form.
+    key = path.removeprefix("secret/data/").removeprefix("secret/")
     try:
-        response = client.secrets.kv.v2.read_secret_version(path=path, raise_on_deleted_version=True)
+        response = client.secrets.kv.v2.read_secret_version(
+            mount_point="secret", path=key, raise_on_deleted_version=True
+        )
         return response["data"]["data"]
     except hvac.exceptions.InvalidPath as exc:
         raise RuntimeError(f"Vault path not found: {path}") from exc

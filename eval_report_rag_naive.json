@@ -1,0 +1,27 @@
+{
+  "golden_set_size": 25,
+  "config": {
+    "corpus": "corpus.jsonl",
+    "strategy": "naive",
+    "model": "multi-qa-mpnet-base-dot-v1",
+    "alpha": 0.6,
+    "transform": "none",
+    "no_gate": true,
+    "no_generation": true,
+    "out": "eval_report_rag_naive.json"
+  },
+  "retrieval": {
+    "n": 25,
+    "hit_at_5": 0.72,
+    "mrr_at_10": 0.4819,
+    "transform": "none"
+  },
+  "generation": {
+    "skipped": true,
+    "faithfulness": 0.0,
+    "answer_relevancy": 0.0,
+    "n": 0
+  },
+  "gate_failures": [],
+  "passed": true
+}

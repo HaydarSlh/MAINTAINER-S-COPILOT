@@ -31,6 +31,7 @@ dependencies = [
     "minio",                # blob storage client
     "fastapi-users[sqlalchemy]",
     "httpx",                # calls to modelserver + LLM provider
+    "openai",               # Grok fallback (OpenAI-compatible SDK)
     "pyyaml",               # eval_thresholds.yaml
     "bcrypt",               # password hashing in auth_service
     "pyjwt",                # JWT encode/decode in auth_service
@@ -40,7 +41,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Installed only in the modelserver image (DL inference).
-modelserver = ["torch", "transformers", "spacy"]
+modelserver = ["torch", "transformers"]
 # Installed only in training jobs (DL track) — not in any runtime container.
 ml = ["torch", "transformers", "datasets", "scikit-learn", "mlflow", "pandas"]
 # RAG offline indexing + retrieval.

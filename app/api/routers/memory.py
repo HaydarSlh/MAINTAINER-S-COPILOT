@@ -57,7 +57,7 @@ async def list_audit(
     ]
 
 
-@router.delete("/memory/{memory_id}", status_code=204)
+@router.delete("/memory/{memory_id}", status_code=204, response_model=None)
 async def delete_memory(
     memory_id: str,
     user: User = Depends(get_current_user),

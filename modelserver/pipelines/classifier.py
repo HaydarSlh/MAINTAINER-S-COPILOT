@@ -97,6 +97,9 @@ def classify(text: str, model_dir: str) -> ClassificationResult:
         return_tensors="pt",
     ).to(device)
 
+    # DistilBERT has no token_type_ids; drop them if tokenizer adds them.
+    inputs = {k: v for k, v in inputs.items() if k != "token_type_ids"}
+
     with torch.no_grad():
         logits = model(**inputs).logits
 

@@ -12,6 +12,7 @@ audit_log. HNSW indexes for both vector columns enable sub-second ANN search.
 import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
+from sqlalchemy.dialects.postgresql import ENUM
 
 revision = "0001_baseline"
 down_revision = None
@@ -20,19 +21,26 @@ depends_on = None
 
 EMBEDDING_DIM = 768
 
+# Enum types are created explicitly below; create_type=False stops SQLAlchemy
+# from re-emitting CREATE TYPE during op.create_table's before_create event.
+_role_enum = ENUM("user", "admin", name="role_enum", create_type=False)
+_memory_type_enum = ENUM(
+    "episodic", "semantic", "procedural", name="memory_type_enum", create_type=False
+)
+
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    op.execute("CREATE TYPE role_enum AS ENUM ('user', 'admin')")
-    op.execute("CREATE TYPE memory_type_enum AS ENUM ('episodic', 'semantic', 'procedural')")
+    op.execute("DO $$ BEGIN CREATE TYPE role_enum AS ENUM ('user', 'admin'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
+    op.execute("DO $$ BEGIN CREATE TYPE memory_type_enum AS ENUM ('episodic', 'semantic', 'procedural'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
 
     op.create_table(
         "users",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True),
         sa.Column("email", sa.String(320), nullable=False),
         sa.Column("hashed_password", sa.String(1024), nullable=False),
-        sa.Column("role", sa.Enum("user", "admin", name="role_enum", create_type=False), nullable=False, server_default="user"),
+        sa.Column("role", _role_enum, nullable=False, server_default="user"),
         sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
         sa.Column("is_verified", sa.Boolean, nullable=False, server_default="false"),
         sa.Column("is_superuser", sa.Boolean, nullable=False, server_default="false"),
@@ -64,7 +72,7 @@ def upgrade() -> None:
         "memory",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True),
         sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("memory_type", sa.Enum("episodic", "semantic", "procedural", name="memory_type_enum", create_type=False), nullable=False),
+        sa.Column("memory_type", _memory_type_enum, nullable=False),
         sa.Column("content", sa.Text, nullable=False),
         sa.Column("embedding", Vector(EMBEDDING_DIM), nullable=True),
         sa.Column("metadata", sa.dialects.postgresql.JSONB, nullable=False, server_default="{}"),

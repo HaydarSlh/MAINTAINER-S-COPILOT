@@ -144,7 +144,8 @@ def _fetch_classical_model() -> Any:
 def _run_classical(examples: list[dict], pipeline: Any) -> list[str]:
     texts = [ex["text"] for ex in examples]
     raw = pipeline.predict(texts)
-    return [str(p) for p in raw]
+    # Pipeline may return int label IDs — map to string labels.
+    return [ID2LABEL.get(int(p), str(p)) for p in raw]
 
 
 # ─────────────────────────── LLM baseline ────────────────────────────────────
