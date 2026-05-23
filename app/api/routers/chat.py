@@ -17,6 +17,7 @@ router = APIRouter(tags=["chat"])
 
 
 class ChatRequest(BaseModel):
+    """Request body for the /chat endpoint."""
     text: str
     conversation_id: str | None = None
 
@@ -26,9 +27,11 @@ async def chat(
     body: ChatRequest,
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
+    """Stream the assistant reply to a user message as SSE."""
     from app.services.chat_service import handle_message
 
     async def _event_stream():
+        """Yield SSE-formatted chunks for the full assistant turn."""
         async for chunk in handle_message(user, body.conversation_id, body.text):
             yield f"data: {chunk}\n\n"
         yield "data: [DONE]\n\n"

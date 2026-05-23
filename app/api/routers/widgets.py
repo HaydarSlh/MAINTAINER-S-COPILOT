@@ -18,6 +18,7 @@ router = APIRouter(tags=["widgets"])
 
 
 class CreateWidgetRequest(BaseModel):
+    """Request body for creating a new widget configuration."""
     allowed_origins: list[str]
     theme: dict = {}
     greeting: str = "How can I help?"
@@ -25,6 +26,7 @@ class CreateWidgetRequest(BaseModel):
 
 
 class UpdateWidgetRequest(BaseModel):
+    """Request body for partial update of an existing widget configuration."""
     allowed_origins: list[str] | None = None
     theme: dict | None = None
     greeting: str | None = None
@@ -32,6 +34,7 @@ class UpdateWidgetRequest(BaseModel):
 
 
 class SnippetResponse(BaseModel):
+    """Response containing the HTML embed snippet for a widget."""
     widget_id: str
     snippet: str
 
@@ -41,6 +44,7 @@ async def create_widget(
     body: CreateWidgetRequest,
     admin: User = Depends(require_admin),
 ) -> WidgetConfig:
+    """Create a new widget config and return it (admin only)."""
     from app.services.widget_service import create_widget as svc_create
     return await svc_create(
         actor=admin,
@@ -57,6 +61,7 @@ async def update_widget(
     body: UpdateWidgetRequest,
     admin: User = Depends(require_admin),
 ) -> WidgetConfig:
+    """Apply partial updates to an existing widget config (admin only)."""
     from app.services.widget_service import update_widget as svc_update
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     return await svc_update(actor=admin, widget_id=widget_id, **updates)
@@ -66,6 +71,7 @@ async def update_widget(
 async def list_widgets(
     _admin: User = Depends(require_admin),
 ) -> list[WidgetConfig]:
+    """List all active widget configurations (admin only)."""
     from app.services.widget_service import list_widgets as svc_list
     return await svc_list()
 
@@ -76,6 +82,7 @@ async def get_snippet(
     request: Request,
     _admin: User = Depends(require_admin),
 ) -> SnippetResponse:
+    """Return the HTML <script> embed tag for a given widget (admin only)."""
     from app.services.widget_service import embed_snippet
     base = str(request.base_url).rstrip("/")
     return SnippetResponse(widget_id=widget_id, snippet=embed_snippet(widget_id, base))

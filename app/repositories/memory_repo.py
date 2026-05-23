@@ -14,6 +14,7 @@ from app.domain.models import MemoryRecord
 
 
 def _to_domain(row: MemoryORM) -> MemoryRecord:
+    """Convert a MemoryORM row to a MemoryRecord domain model."""
     return MemoryRecord(
         id=str(row.id),
         user_id=str(row.user_id),
@@ -25,6 +26,7 @@ def _to_domain(row: MemoryORM) -> MemoryRecord:
 async def insert_memory(session: AsyncSession, user_id: str,
                          memory_type: MemoryType, content: str,
                          embedding: list[float]) -> MemoryRecord:
+    """Persist a new memory entry with its embedding vector and return the domain model."""
     row = MemoryORM(
         id=uuid.uuid4(),
         user_id=uuid.UUID(user_id),
@@ -65,6 +67,7 @@ async def search(session: AsyncSession, user_id: str,
 
 async def list_for_user(session: AsyncSession,
                          user_id: str) -> list[MemoryRecord]:
+    """Return all memory records for a user, most recent first."""
     result = await session.execute(
         select(MemoryORM)
         .where(MemoryORM.user_id == uuid.UUID(user_id))
@@ -74,6 +77,7 @@ async def list_for_user(session: AsyncSession,
 
 
 async def delete_memory(session: AsyncSession, memory_id: str) -> None:
+    """Delete a memory entry by its UUID string."""
     row = await session.get(MemoryORM, uuid.UUID(memory_id))
     if row:
         await session.delete(row)

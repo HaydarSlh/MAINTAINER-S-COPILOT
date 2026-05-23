@@ -13,16 +13,19 @@ router = APIRouter()
 
 
 class SummarizeRequest(BaseModel):
+    """Request body for the /summarize endpoint."""
     text: str = Field(..., min_length=1, max_length=32_000)
 
 
 class SummarizeResponse(BaseModel):
+    """Summarization result indicating whether the LLM or extractive fallback was used."""
     summary: str
     llm_used: bool
 
 
 @router.post("/summarize", response_model=SummarizeResponse, summary="Summarize a GitHub issue thread")
 def summarize_issue(req: SummarizeRequest) -> SummarizeResponse:
+    """Summarize the request text via Gemini and return the result with a fallback flag."""
     try:
         summary, llm_used = summarize(req.text)
     except Exception as exc:

@@ -14,6 +14,7 @@ from app.db.orm import ConversationORM, MessageORM
 
 async def create_conversation(session: AsyncSession, user_id: str,
                                widget_id: str | None = None) -> ConversationORM:
+    """Insert a new conversation row and return it."""
     row = ConversationORM(
         id=uuid.uuid4(),
         user_id=uuid.UUID(user_id),
@@ -26,6 +27,7 @@ async def create_conversation(session: AsyncSession, user_id: str,
 
 async def get_conversation(session: AsyncSession,
                             conversation_id: str) -> ConversationORM | None:
+    """Fetch a conversation by ID with its messages eagerly loaded."""
     return await session.get(
         ConversationORM,
         uuid.UUID(conversation_id),
@@ -36,6 +38,7 @@ async def get_conversation(session: AsyncSession,
 async def append_message(session: AsyncSession, conversation_id: str,
                           role: str, content: str,
                           tool_calls: dict | None = None) -> MessageORM:
+    """Append a new message row to an existing conversation."""
     row = MessageORM(
         id=uuid.uuid4(),
         conversation_id=uuid.UUID(conversation_id),
@@ -50,6 +53,7 @@ async def append_message(session: AsyncSession, conversation_id: str,
 
 async def list_for_user(session: AsyncSession,
                          user_id: str) -> list[ConversationORM]:
+    """Return all conversations for a user, most recent first."""
     result = await session.execute(
         select(ConversationORM)
         .where(ConversationORM.user_id == uuid.UUID(user_id))
@@ -59,6 +63,7 @@ async def list_for_user(session: AsyncSession,
 
 
 async def delete(session: AsyncSession, conversation_id: str) -> None:
+    """Delete a conversation and its messages (cascaded by the DB)."""
     row = await session.get(ConversationORM, uuid.UUID(conversation_id))
     if row:
         await session.delete(row)

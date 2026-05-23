@@ -13,10 +13,12 @@ router = APIRouter()
 
 
 class NERRequest(BaseModel):
+    """Request body for the /ner endpoint."""
     text: str = Field(..., min_length=1, max_length=32_000)
 
 
 class EntityOut(BaseModel):
+    """A single entity extracted by the NER pipeline, serialized for the API response."""
     text: str
     label: str
     start: int
@@ -24,12 +26,14 @@ class EntityOut(BaseModel):
 
 
 class NERResponse(BaseModel):
+    """NER endpoint response containing the entity list and total count."""
     entities: list[EntityOut]
     count: int
 
 
 @router.post("/ner", response_model=NERResponse, summary="Extract code entities from issue text")
 def ner(req: NERRequest) -> NERResponse:
+    """Run the NER pipeline on the request text and return extracted entities."""
     try:
         entities = extract(req.text)
     except Exception as exc:

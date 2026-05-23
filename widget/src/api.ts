@@ -10,12 +10,32 @@ export interface WidgetConfig {
   enabled_tools: string[];
 }
 
+// Fetch the public configuration for a widget by its ID.
 export async function fetchConfig(widgetId: string): Promise<WidgetConfig> {
   const resp = await fetch(`${API_BASE}/embed/config/${widgetId}`);
   if (!resp.ok) throw new Error(`Config fetch failed: ${resp.status}`);
   return resp.json();
 }
 
+export interface HistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// Load past messages for a conversation from the embed history endpoint.
+export async function fetchHistory(
+  widgetId: string,
+  conversationId: string,
+): Promise<HistoryMessage[]> {
+  const resp = await fetch(
+    `${API_BASE}/embed/history/${widgetId}/${conversationId}`,
+  );
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return data.messages || [];
+}
+
+// Stream SSE chunks from the embed chat endpoint, yielding each data line.
 export async function* streamChat(
   widgetId: string,
   text: string,
@@ -24,7 +44,7 @@ export async function* streamChat(
   const body: Record<string, unknown> = { text, widget_id: widgetId };
   if (conversationId) body.conversation_id = conversationId;
 
-  const resp = await fetch(`${API_BASE}/chat`, {
+  const resp = await fetch(`${API_BASE}/embed/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify(body),

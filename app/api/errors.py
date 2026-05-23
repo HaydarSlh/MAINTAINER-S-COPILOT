@@ -24,6 +24,7 @@ _STATUS_MAP: dict[type[DomainError], int] = {
 
 
 def domain_error_to_response(exc: DomainError) -> JSONResponse:
+    """Map a DomainError subclass to the appropriate HTTP status and JSON body."""
     status = _STATUS_MAP.get(type(exc), 400)
     return JSONResponse(
         status_code=status,

@@ -9,6 +9,7 @@ from enum import Enum
 
 
 class IssueLabel(str, Enum):
+    """The four target classes for GitHub issue classification."""
     BUG = "bug"
     FEATURE = "feature"
     DOCS = "docs"
@@ -16,11 +17,13 @@ class IssueLabel(str, Enum):
 
 
 class Role(str, Enum):
+    """Authorization role; drives admin-only route guards."""
     USER = "user"
     ADMIN = "admin"
 
 
 class MemoryType(str, Enum):
+    """Taxonomy for long-term memory entries (episodic, semantic, or procedural)."""
     EPISODIC = "episodic"
     SEMANTIC = "semantic"
     PROCEDURAL = "procedural"

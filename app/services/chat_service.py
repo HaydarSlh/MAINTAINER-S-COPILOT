@@ -49,7 +49,15 @@ _TOOL_SCHEMAS = [
 
 
 def _load_system_prompt() -> str:
+    """Read the chatbot system prompt from disk."""
     return _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+_GREETINGS = {"hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "bye", "yes", "no", "sure"}
+
+def _is_small_talk(text: str) -> bool:
+    """Return True if the message is a greeting or one-word reply that doesn't need a long answer."""
+    return text.strip().lower().rstrip("!.,?") in _GREETINGS or len(text.split()) <= 3
 
 
 def _build_messages(
@@ -58,6 +66,7 @@ def _build_messages(
     memory_context: str,
     user_text: str,
 ) -> list[dict]:
+    """Assemble the full message list for the LLM from system prompt, memory, history, and user input."""
     messages: list[dict] = [{"role": "system", "content": system}]
     if memory_context:
         messages.append({
@@ -65,11 +74,23 @@ def _build_messages(
             "content": f"Relevant memories from past sessions:\n{memory_context}",
         })
     messages.extend(history)
-    messages.append({"role": "user", "content": user_text})
+    # For technical questions, append a hard length reminder directly to the user
+    # message — Gemini Flash ignores system-prompt length rules without this nudge.
+    if not _is_small_talk(user_text):
+        augmented = (
+            user_text
+            + "\n\n[REMINDER: Your answer MUST be 250-450 words. Use the required structure: "
+            "opening sentence, 4-7 bulleted points each at least 20 words, a Python code example, "
+            "and a closing pitfalls/version note. Do NOT give a short answer.]"
+        )
+    else:
+        augmented = user_text
+    messages.append({"role": "user", "content": augmented})
     return messages
 
 
 async def _run_tool(name: str, arguments: dict, user_id: str) -> str:
+    """Dispatch a tool call by name and return its JSON-serialized result."""
     module = _TOOLS.get(name)
     if module is None:
         raise ToolFailure(f"Unknown tool: {name}")

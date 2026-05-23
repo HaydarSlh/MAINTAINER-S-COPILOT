@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Application-wide non-secret settings resolved from environment variables or .env."""
     # Vault locator (token itself is the only secret allowed in .env)
     vault_addr: str = "http://vault:8200"
     vault_dev_root_token: str = ""

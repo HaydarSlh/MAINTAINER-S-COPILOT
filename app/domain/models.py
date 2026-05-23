@@ -13,18 +13,21 @@ from app.domain.enums import IssueLabel, MemoryType, Role
 
 
 class User(BaseModel):
+    """Domain model representing an authenticated user."""
     id: str
     email: str
     role: Role
 
 
 class Conversation(BaseModel):
+    """Domain model representing a chat conversation."""
     id: str
     user_id: str
     created_at: datetime
 
 
 class Classification(BaseModel):
+    """Result of the issue classification pipeline including the predicted label and confidence."""
     label: IssueLabel
     confidence: float
     fallback_used: bool = False   # True when LLM fallback fired due to low DL confidence

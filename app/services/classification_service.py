@@ -32,6 +32,7 @@ _VALID_LABELS = {"bug", "feature", "docs", "question"}
 
 
 def _prompt_template() -> str:
+    """Load and cache the LLM classifier baseline prompt from disk."""
     global _PROMPT_TEMPLATE
     if _PROMPT_TEMPLATE is None:
         _PROMPT_TEMPLATE = _PROMPT_PATH.read_text(encoding="utf-8")

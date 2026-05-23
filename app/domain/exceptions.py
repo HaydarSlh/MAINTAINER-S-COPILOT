@@ -16,10 +16,12 @@ class DomainError(Exception):
 
 
 class NotFoundError(DomainError):
+    """Raised when a requested resource does not exist."""
     code = "not_found"
 
 
 class PermissionDenied(DomainError):
+    """Raised when the actor lacks the required permissions for an operation."""
     code = "permission_denied"
 
 
@@ -31,4 +33,5 @@ class ToolFailure(DomainError):
 
 
 class ValidationError(DomainError):
+    """Raised when input data fails domain-level validation rules."""
     code = "validation_error"

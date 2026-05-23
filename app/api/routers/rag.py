@@ -16,11 +16,13 @@ router = APIRouter(tags=["rag"])
 
 
 class RAGRequest(BaseModel):
+    """Request body for the /rag/query endpoint."""
     question: str
     transform: str = "multi_query"
 
 
 class Citation(BaseModel):
+    """A single cited source chunk returned alongside a RAG answer."""
     chunk_id: str
     doc_id: str
     section_title: str
@@ -29,6 +31,7 @@ class Citation(BaseModel):
 
 
 class RAGResponse(BaseModel):
+    """Full RAG answer with citations and pipeline metadata."""
     answer: str
     citations: list[Citation]
     query_transform_used: str
@@ -41,6 +44,7 @@ async def rag_query(
     body: RAGRequest,
     _user: User = Depends(get_current_user),
 ) -> RAGResponse:
+    """Answer a technical question using the full RAG pipeline and return cited results."""
     from app.services.rag_service import answer
 
     result = await answer(body.question, transform=body.transform)

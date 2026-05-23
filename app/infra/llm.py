@@ -1,7 +1,7 @@
-"""LLM provider adapter — Gemini primary, Grok backup.
+"""LLM provider adapter — Gemini primary, Groq backup.
 
 The chatbot is ONE tool-calling LLM. This adapter wraps both providers,
-tries Gemini first, falls back to Grok (xAI) if Gemini exhausts retries.
+tries Gemini first, falls back to Groq (xAI) if Gemini exhausts retries.
 API keys come from Vault (never from env in production).
 Provider/model choice recorded in DECISIONS.md D12.
 
@@ -20,7 +20,7 @@ from app.infra.tracing import span as trace_span
 
 # ── Model IDs ─────────────────────────────────────────────────────────────────
 GEMINI_MODEL  = "gemini-2.5-flash"
-GROK_MODEL    = "grok-3-mini"
+GROQ_MODEL    = "llama-3.3-70b-versatile"
 
 # Transient error codes that warrant a retry / fallback
 _TRANSIENT = ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded")
@@ -30,6 +30,7 @@ _MAX_RETRIES = 3   # per provider before falling back
 
 @dataclass
 class LLMResponse:
+    """Unified response envelope returned by both Gemini and Groq providers."""
     content: str
     provider: str          # "gemini" or "claude"
     model: str
@@ -41,6 +42,7 @@ class LLMResponse:
 # ── Key resolution ─────────────────────────────────────────────────────────────
 
 def _gemini_key() -> str:
+    """Resolve the Google Gemini API key from Vault, falling back to env var."""
     try:
         from app.infra.vault import read_secret
         key = read_secret("secret/data/llm").get("api_key", "")
@@ -51,20 +53,24 @@ def _gemini_key() -> str:
     return os.environ.get("GOOGLE_API_KEY", "")
 
 
-def _grok_key() -> str:
+def _groq_key() -> str:
+    """Resolve the Groq API key from Vault, falling back to env var."""
     try:
         from app.infra.vault import read_secret
-        key = read_secret("secret/data/llm").get("grok_api_key", "")
+        secret = read_secret("secret/data/llm")
+        # Accept either name during the Groq→Groq migration
+        key = secret.get("groq_api_key") or secret.get("grok_api_key") or ""
         if key:
             return key
     except Exception:
         pass
-    return os.environ.get("GROK_API_KEY", "")
+    return os.environ.get("GROQ_API_KEY", os.environ.get("GROK_API_KEY", ""))
 
 
 # ── Gemini call ────────────────────────────────────────────────────────────────
 
 def _call_gemini(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
+    """Send a chat request to Gemini with retry/backoff logic and return an LLMResponse."""
     import google.genai as genai
     from google.genai import types as gtypes
 
@@ -87,8 +93,14 @@ def _call_gemini(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
         else:
             contents.append(gtypes.Content(role="user", parts=[gtypes.Part(text=content)]))
 
+    # max_output_tokens lifted from the default — without an explicit cap Gemini
+    # Flash truncates technical answers to a few sentences, ignoring the system-
+    # prompt length requirement. 2048 tokens ≈ 1500 English words, plenty of room
+    # for the 250-450 word target.
     config = gtypes.GenerateContentConfig(
         system_instruction=system_instruction,
+        max_output_tokens=2048,
+        temperature=0.7,
     )
 
     # Tool declarations
@@ -97,6 +109,8 @@ def _call_gemini(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
         config = gtypes.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=gemini_tools,
+            max_output_tokens=2048,
+            temperature=0.7,
         )
 
     delay = 4
@@ -149,29 +163,37 @@ def _tools_to_gemini(tools: list[dict]) -> list:
 
 
 def _extract_gemini_tool_calls(resp) -> list[dict]:
+    """Extract function-call tool invocations from a Gemini response object."""
     calls = []
-    for part in (resp.candidates or [{}])[0].content.parts if resp.candidates else []:
-        if hasattr(part, "function_call") and part.function_call:
+    candidates = getattr(resp, "candidates", None) or []
+    if not candidates:
+        return calls
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) or []
+    for part in parts:
+        fn = getattr(part, "function_call", None)
+        if fn:
             calls.append({
-                "name": part.function_call.name,
-                "arguments": dict(part.function_call.args or {}),
+                "name": fn.name,
+                "arguments": dict(fn.args or {}),
             })
     return calls
 
 
-# ── Grok call (OpenAI-compatible) ─────────────────────────────────────────────
+# ── Groq call (OpenAI-compatible) ─────────────────────────────────────────────
 
-def _call_grok(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
+def _call_groq(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
+    """Send a chat request to Groq via the OpenAI-compatible API with retry/backoff."""
     from openai import OpenAI
 
-    key = _grok_key()
+    key = _groq_key()
     if not key:
-        raise RuntimeError("Grok API key not available")
+        raise RuntimeError("Groq API key not available")
 
-    client = OpenAI(api_key=key, base_url="https://api.x.ai/v1")
+    client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
 
     kwargs: dict[str, Any] = dict(
-        model=GROK_MODEL,
+        model=GROQ_MODEL,
         max_tokens=2048,
         messages=messages,
     )
@@ -196,8 +218,8 @@ def _call_grok(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
                     })
             return LLMResponse(
                 content=text,
-                provider="grok",
-                model=GROK_MODEL,
+                provider="groq",
+                model=GROQ_MODEL,
                 input_tokens=resp.usage.prompt_tokens if resp.usage else 0,
                 output_tokens=resp.usage.completion_tokens if resp.usage else 0,
                 tool_calls=tool_calls,
@@ -212,7 +234,7 @@ def _call_grok(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
             else:
                 break
 
-    raise RuntimeError(f"Grok failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
+    raise RuntimeError(f"Groq failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
 
 
 # ── Public interface ───────────────────────────────────────────────────────────
@@ -249,11 +271,11 @@ def chat(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
                 gemini_err = e
                 s.set_attribute("llm.gemini_error", str(e)[:200])
 
-        # Fall back to Grok
-        if _grok_key():
+        # Fall back to Groq
+        if _groq_key():
             try:
                 t0 = time.monotonic()
-                result = _call_grok(messages, tools)
+                result = _call_groq(messages, tools)
                 latency_ms = int((time.monotonic() - t0) * 1000)
                 s.set_attribute("llm.provider", result.provider)
                 s.set_attribute("llm.model", result.model)
@@ -264,7 +286,7 @@ def chat(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
                 return result
             except Exception as e:
                 raise RuntimeError(
-                    f"Both LLM providers failed. Gemini: {gemini_err}. Grok: {e}"
+                    f"Both LLM providers failed. Gemini: {gemini_err}. Groq: {e}"
                 ) from e
 
         raise RuntimeError(

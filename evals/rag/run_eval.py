@@ -40,6 +40,7 @@ THRESHOLDS_FILE = _REPO / "eval_thresholds.yaml"
 # ── Loaders ───────────────────────────────────────────────────────────────────
 
 def _load_golden() -> list[dict]:
+    """Load and return all non-comment examples from the RAG golden set JSONL."""
     examples = []
     with open(GOLDEN_SET) as f:
         for line in f:
@@ -53,6 +54,7 @@ def _load_golden() -> list[dict]:
 
 
 def _load_thresholds() -> dict:
+    """Parse and return eval_thresholds.yaml as a dict."""
     with open(THRESHOLDS_FILE) as f:
         return yaml.safe_load(f)
 
@@ -60,11 +62,13 @@ def _load_thresholds() -> dict:
 # ── Retrieval metrics ─────────────────────────────────────────────────────────
 
 def _hit_at_k(retrieved_ids: list[str], ground_truth_ids: list[str], k: int) -> float:
+    """Return 1.0 if any ground-truth ID appears in the top-k retrieved IDs, else 0.0."""
     top_k = set(retrieved_ids[:k])
     return float(bool(top_k & set(ground_truth_ids)))
 
 
 def _reciprocal_rank(retrieved_ids: list[str], ground_truth_ids: list[str]) -> float:
+    """Return 1/rank of the first ground-truth ID in the retrieved list, or 0 if absent."""
     gt = set(ground_truth_ids)
     for rank, cid in enumerate(retrieved_ids, start=1):
         if cid in gt:
@@ -136,6 +140,7 @@ def eval_generation(examples: list[dict]) -> dict:
 
 
 def _ragas_score(rows: list[dict]) -> dict:
+    """Compute RAGAS faithfulness and answer_relevancy scores over all generated rows."""
     try:
         from ragas import evaluate
         from ragas.metrics import faithfulness, answer_relevancy
@@ -182,6 +187,7 @@ def _agreement(hand_labeled: list[dict]) -> float:
 # ── Gate ──────────────────────────────────────────────────────────────────────
 
 def _gate(retrieval: dict, generation: dict, thresholds: dict) -> list[str]:
+    """Return a list of failure messages for any metric that misses its threshold floor."""
     failures = []
     cfg = thresholds.get("rag", {})
     retrieval_checks = [
@@ -208,6 +214,7 @@ def _gate(retrieval: dict, generation: dict, thresholds: dict) -> list[str]:
 # ── Report I/O ────────────────────────────────────────────────────────────────
 
 def _write_and_upload(report: dict, out_path: Path) -> None:
+    """Write the report to disk as JSON and best-effort upload it to MinIO."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
@@ -233,6 +240,7 @@ def _write_and_upload(report: dict, out_path: Path) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    """Entry point: load the index, run retrieval and generation evals, write the report."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus", required=True)
     parser.add_argument("--strategy", default="structure", choices=["structure", "naive"])

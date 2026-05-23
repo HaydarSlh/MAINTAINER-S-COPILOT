@@ -44,6 +44,7 @@ Answer:"""
 
 @dataclass
 class Citation:
+    """A single document chunk referenced by a RAG answer."""
     chunk_id: str
     doc_id: str
     section_title: str
@@ -53,6 +54,7 @@ class Citation:
 
 @dataclass
 class RAGAnswer:
+    """Full result returned by the RAG pipeline including answer text, citations, and metadata."""
     answer: str
     citations: list[Citation]
     query_transform_used: str
@@ -61,6 +63,7 @@ class RAGAnswer:
 
 
 def _format_context(chunks) -> str:
+    """Format retrieved chunks as a labelled context block for the answer prompt."""
     parts = []
     for c in chunks:
         title = c.metadata.get("section_title", "")

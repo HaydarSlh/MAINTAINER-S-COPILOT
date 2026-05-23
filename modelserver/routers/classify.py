@@ -17,10 +17,12 @@ _MODEL_DIR = os.environ.get("CLASSIFIER_MODEL_DIR", "")
 
 
 class ClassifyRequest(BaseModel):
+    """Request body for the /classify endpoint."""
     text: str = Field(..., min_length=1, max_length=32_000)
 
 
 class ClassifyResponse(BaseModel):
+    """Classification result returned by /classify."""
     label: str
     label_id: int
     confidence: float
@@ -29,6 +31,7 @@ class ClassifyResponse(BaseModel):
 
 @router.post("/classify", response_model=ClassifyResponse, summary="Classify a GitHub issue")
 def classify_issue(req: ClassifyRequest) -> ClassifyResponse:
+    """Run the fine-tuned classifier on the request text and return label and scores."""
     if not _MODEL_DIR:
         raise HTTPException(
             status_code=503,

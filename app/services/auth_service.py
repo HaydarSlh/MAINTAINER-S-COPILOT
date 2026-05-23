@@ -21,6 +21,7 @@ _JWT_EXPIRE_HOURS = 24
 
 
 def _jwt_secret() -> str:
+    """Resolve the JWT signing secret from Vault, falling back to the JWT_SECRET env var."""
     try:
         from app.infra.vault import read_secret
         secret = read_secret("secret/data/llm").get("jwt_secret", "")
@@ -35,14 +36,17 @@ def _jwt_secret() -> str:
 
 
 def hash_password(plain: str) -> str:
+    """Hash a plaintext password using bcrypt."""
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plaintext password against a bcrypt hash."""
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 def issue_token(user: User) -> str:
+    """Generate a signed JWT for the given user with a 24-hour expiry."""
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user.id,

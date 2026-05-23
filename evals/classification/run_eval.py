@@ -48,6 +48,7 @@ ID2LABEL = {i: l for l, i in LABEL2ID.items()}
 # ─────────────────────────── helpers ─────────────────────────────────────────
 
 def _load_golden() -> list[dict]:
+    """Load and return all examples from the golden set JSONL file."""
     examples = []
     with open(GOLDEN_SET) as f:
         for line in f:
@@ -61,6 +62,7 @@ def _load_golden() -> list[dict]:
 
 
 def _load_thresholds() -> dict:
+    """Parse and return eval_thresholds.yaml as a dict."""
     with open(THRESHOLDS_FILE) as f:
         return yaml.safe_load(f)
 
@@ -142,6 +144,7 @@ def _fetch_classical_model() -> Any:
 
 
 def _run_classical(examples: list[dict], pipeline: Any) -> list[str]:
+    """Run the classical ML pipeline on all examples and return string label predictions."""
     texts = [ex["text"] for ex in examples]
     raw = pipeline.predict(texts)
     # Pipeline may return int label IDs — map to string labels.
@@ -192,6 +195,7 @@ def _run_llm(examples: list[dict]) -> list[str | None]:
 
 
 def _llm_classify_one(client: Any, prompt_tmpl: str, text: str, max_retries: int = 6) -> str | None:
+    """Classify a single issue text with the LLM, retrying on transient errors."""
     delay = 5
     for attempt in range(max_retries):
         try:
@@ -216,6 +220,7 @@ def _llm_classify_one(client: Any, prompt_tmpl: str, text: str, max_retries: int
 # ─────────────────────────── report writer ───────────────────────────────────
 
 def _write_report(report: dict, out_path: Path) -> None:
+    """Write the eval report dict as formatted JSON to out_path."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
@@ -247,6 +252,7 @@ def _upload_report(report: dict, out_path: Path) -> None:
 # ─────────────────────────── main ────────────────────────────────────────────
 
 def main() -> None:
+    """Entry point: parse args, run all three models, write the report, and apply the CI gate."""
     parser = argparse.ArgumentParser(description="Classification golden-set eval")
     parser.add_argument("--model-dir", default=os.environ.get("CLASSIFIER_MODEL_DIR", ""),
                         help="Path to fetched DistilBERT model directory")

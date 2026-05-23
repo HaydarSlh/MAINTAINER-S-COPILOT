@@ -12,6 +12,7 @@ from app.domain.models import WidgetConfig
 
 
 def _to_domain(row: WidgetORM) -> WidgetConfig:
+    """Convert a WidgetORM row to a WidgetConfig domain model."""
     return WidgetConfig(
         widget_id=row.id,
         allowed_origins=row.allowed_origins,
@@ -21,8 +22,14 @@ def _to_domain(row: WidgetORM) -> WidgetConfig:
     )
 
 
+async def get_orm_by_id(session: AsyncSession, widget_id: str) -> WidgetORM | None:
+    """Return the raw ORM row for a widget, used when the owner_id is needed."""
+    return await session.get(WidgetORM, widget_id)
+
+
 async def get_by_widget_id(session: AsyncSession,
                             widget_id: str) -> WidgetConfig | None:
+    """Fetch an active widget config as a domain model, or None if absent/inactive."""
     row = await session.get(WidgetORM, widget_id)
     return _to_domain(row) if row and row.is_active else None
 
@@ -30,6 +37,7 @@ async def get_by_widget_id(session: AsyncSession,
 async def create(session: AsyncSession, owner_id: str,
                   allowed_origins: list[str], theme: dict,
                   greeting: str, enabled_tools: list[str]) -> WidgetConfig:
+    """Insert a new widget row with a generated short ID and return the domain model."""
     widget_id = uuid.uuid4().hex[:12]
     row = WidgetORM(
         id=widget_id,
@@ -45,6 +53,7 @@ async def create(session: AsyncSession, owner_id: str,
 
 
 async def update(session: AsyncSession, widget_id: str, **kwargs) -> WidgetConfig:
+    """Apply keyword-argument updates to a widget row and return the updated domain model."""
     row = await session.get(WidgetORM, widget_id)
     if row is None:
         raise ValueError(f"Widget {widget_id} not found")
@@ -55,6 +64,7 @@ async def update(session: AsyncSession, widget_id: str, **kwargs) -> WidgetConfi
 
 
 async def list_all(session: AsyncSession) -> list[WidgetConfig]:
+    """Return all active widget configurations as domain models."""
     result = await session.execute(
         select(WidgetORM).where(WidgetORM.is_active == True)
     )

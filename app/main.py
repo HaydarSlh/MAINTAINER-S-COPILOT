@@ -15,6 +15,7 @@ import yaml
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.domain.exceptions import DomainError
@@ -26,6 +27,7 @@ _MODEL_CARD_PATH = Path(__file__).parent / "artifacts" / "model_card.json"
 
 
 def _guard_vault() -> None:
+    """Raise RuntimeError if Vault is unreachable or the token is invalid."""
     if not is_reachable():
         raise RuntimeError(
             "Vault is unreachable. Start the vault container and re-run "
@@ -42,6 +44,7 @@ def _guard_eval_thresholds() -> None:
         thresholds = yaml.safe_load(f)
 
     def _walk(obj, path=""):
+        """Recursively walk the threshold dict and raise on any zero value."""
         if isinstance(obj, dict):
             for k, v in obj.items():
                 _walk(v, f"{path}.{k}" if path else k)
@@ -67,6 +70,7 @@ def _run_boot_guards() -> None:
 
 
 def create_app() -> FastAPI:
+    """Construct the FastAPI application, run boot guards, and mount all routers."""
     app = FastAPI(
         title="Maintainer's Copilot API",
         description="Authenticated chatbot for open-source maintainers.",
@@ -75,13 +79,26 @@ def create_app() -> FastAPI:
 
     _run_boot_guards()
 
+    # CORS — widget runs on a different origin from the api, so the browser
+    # sends OPTIONS preflight. Per-endpoint allowlisting (widget→host) is still
+    # enforced by /embed/config/{id} via DB-driven CSP frame-ancestors.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
+
     @app.exception_handler(DomainError)
     async def _domain_error_handler(request: Request, exc: DomainError):
+        """Convert any DomainError into a structured JSON error response."""
         from app.api.errors import domain_error_to_response
         return domain_error_to_response(exc)
 
     @app.get("/health", tags=["ops"])
     async def health():
+        """Return a simple liveness probe response."""
         return {"status": "ok"}
 
     # Routers mounted here as they are implemented.

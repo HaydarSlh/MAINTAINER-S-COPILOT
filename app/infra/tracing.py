@@ -49,6 +49,7 @@ def init_tracing() -> None:
 
 
 def _get_tracer() -> trace.Tracer:
+    """Return the module-level tracer, raising if init_tracing() was not called."""
     if _tracer is None:
         raise RuntimeError("Tracing not initialised — call init_tracing() at boot.")
     return _tracer

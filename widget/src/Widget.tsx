@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { streamChat } from "./api";
-import { observeResize } from "./postMessage";
+import { streamChat, fetchHistory } from "./api";
 import type { WidgetConfig } from "./api";
 
 interface Message {
@@ -13,6 +12,9 @@ interface Props {
   widgetId: string;
 }
 
+const STORAGE_KEY = (widgetId: string) => `copilot:conv:${widgetId}`;
+
+// Embeddable chat widget rendered inside the host-page iframe.
 export function Widget({ config, widgetId }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,14 +26,41 @@ export function Widget({ config, widgetId }: Props) {
 
   const primary = config.theme?.primary ?? "#6366f1";
 
+  // Restore conversation_id from localStorage on mount + load past messages
   useEffect(() => {
-    if (rootRef.current) return observeResize(rootRef.current);
-  }, []);
+    const saved = localStorage.getItem(STORAGE_KEY(widgetId));
+    if (saved) {
+      setConvId(saved);
+      fetchHistory(widgetId, saved)
+        .then((history) => {
+          if (history.length > 0) setMessages(history);
+        })
+        .catch(() => {});
+    }
+  }, [widgetId]);
+
+  // Persist conversation_id whenever it changes
+  useEffect(() => {
+    if (convId) localStorage.setItem(STORAGE_KEY(widgetId), convId);
+  }, [convId, widgetId]);
+
+  useEffect(() => {
+    // Tell the host page to resize the iframe whenever open state changes
+    window.parent.postMessage({ type: "copilot:resize", open }, "*");
+  }, [open]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
 
+  // Clear the stored conversation and show the greeting message.
+  function startNewChat() {
+    localStorage.removeItem(STORAGE_KEY(widgetId));
+    setConvId(null);
+    setMessages([{ role: "assistant", content: config.greeting }]);
+  }
+
+  // Send the current input to the chat API and stream the assistant reply into the message list.
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
@@ -100,8 +129,10 @@ export function Widget({ config, widgetId }: Props) {
       ref={rootRef}
       style={{
         display: "flex", flexDirection: "column",
-        height: "100vh", fontFamily: "system-ui, sans-serif",
+        height: "100%", width: "100%",
+        fontFamily: "system-ui, sans-serif",
         fontSize: 14, background: "#fff",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
@@ -113,16 +144,29 @@ export function Widget({ config, widgetId }: Props) {
         }}
       >
         <span style={{ fontWeight: 600 }}>Maintainer's Copilot</span>
-        <button
-          onClick={() => setOpen(false)}
-          style={{
-            background: "none", border: "none", color: "#fff",
-            cursor: "pointer", fontSize: 18, lineHeight: 1,
-          }}
-          aria-label="Close"
-        >
-          ×
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={startNewChat}
+            style={{
+              background: "rgba(255,255,255,0.18)", border: "none", color: "#fff",
+              cursor: "pointer", fontSize: 12, padding: "4px 8px", borderRadius: 6,
+            }}
+            aria-label="New chat"
+            title="Start a new conversation"
+          >
+            New
+          </button>
+          <button
+            onClick={() => setOpen(false)}
+            style={{
+              background: "none", border: "none", color: "#fff",
+              cursor: "pointer", fontSize: 18, lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Messages */}

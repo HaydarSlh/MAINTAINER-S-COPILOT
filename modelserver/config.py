@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings
 
 
 class ModelServerSettings(BaseSettings):
+    """Non-secret runtime config for the modelserver (port, artifact manifest path)."""
     modelserver_port: int = 8001
     # Where the fine-tuned classifier artifact is fetched from (MinIO manifest).
     artifact_manifest: str = "models/classifier/manifest.json"

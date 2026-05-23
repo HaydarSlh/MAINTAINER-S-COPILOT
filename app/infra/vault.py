@@ -15,6 +15,7 @@ from app.config import settings
 
 
 def _client() -> hvac.Client:
+    """Build an hvac client configured from settings (not cached — tokens may rotate)."""
     return hvac.Client(
         url=settings.vault_addr,
         token=settings.vault_dev_root_token,

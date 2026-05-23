@@ -16,6 +16,7 @@ _TIMEOUT = 30.0
 
 
 def _headers(token: str) -> dict:
+    """Return an Authorization header dict for the given bearer token."""
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -44,6 +45,7 @@ def login(email: str, password: str) -> dict:
 
 
 def get_me(token: str) -> dict:
+    """Return the authenticated user's profile dict."""
     r = httpx.get(f"{API_BASE}/auth/me", headers=_headers(token), timeout=_TIMEOUT)
     r.raise_for_status()
     return r.json()
@@ -81,12 +83,14 @@ def chat_stream(
 # ── Memory ────────────────────────────────────────────────────────────────────
 
 def get_memories(token: str) -> list[dict]:
+    """Fetch all long-term memory records for the authenticated user."""
     r = httpx.get(f"{API_BASE}/memory", headers=_headers(token), timeout=_TIMEOUT)
     r.raise_for_status()
     return r.json()
 
 
 def delete_memory(token: str, memory_id: str) -> None:
+    """Delete a single memory record by its ID."""
     r = httpx.delete(
         f"{API_BASE}/memory/{memory_id}",
         headers=_headers(token),
@@ -96,6 +100,7 @@ def delete_memory(token: str, memory_id: str) -> None:
 
 
 def get_audit_log(token: str, limit: int = 100) -> list[dict]:
+    """Fetch recent audit-log entries (admin only)."""
     r = httpx.get(
         f"{API_BASE}/memory/audit",
         params={"limit": limit},
@@ -109,12 +114,14 @@ def get_audit_log(token: str, limit: int = 100) -> list[dict]:
 # ── Widgets ───────────────────────────────────────────────────────────────────
 
 def list_widgets(token: str) -> list[dict]:
+    """Return all active widget configurations from the API."""
     r = httpx.get(f"{API_BASE}/widgets", headers=_headers(token), timeout=_TIMEOUT)
     r.raise_for_status()
     return r.json()
 
 
 def create_widget(token: str, payload: dict) -> dict:
+    """Create a new widget config and return the created config dict."""
     r = httpx.post(
         f"{API_BASE}/widgets",
         json=payload,
@@ -126,6 +133,7 @@ def create_widget(token: str, payload: dict) -> dict:
 
 
 def update_widget(token: str, widget_id: str, payload: dict) -> dict:
+    """Update an existing widget config and return the updated config dict."""
     r = httpx.put(
         f"{API_BASE}/widgets/{widget_id}",
         json=payload,
@@ -137,6 +145,7 @@ def update_widget(token: str, widget_id: str, payload: dict) -> dict:
 
 
 def get_snippet(token: str, widget_id: str) -> str:
+    """Return the HTML embed snippet string for the given widget."""
     r = httpx.get(
         f"{API_BASE}/widgets/{widget_id}/snippet",
         headers=_headers(token),

@@ -19,6 +19,7 @@ _bearer = HTTPBearer(auto_error=False)
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> User:
+    """Extract and validate the Bearer JWT, returning the corresponding User."""
     if creds is None:
         raise PermissionDenied("No authorization header")
 
@@ -37,6 +38,7 @@ async def get_current_user(
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Raise PermissionDenied if the authenticated user is not an admin."""
     if user.role != Role.ADMIN:
         raise PermissionDenied("Admin access required")
     return user

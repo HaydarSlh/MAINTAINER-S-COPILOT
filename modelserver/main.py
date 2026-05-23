@@ -59,6 +59,7 @@ def _verify_weights() -> None:
 
 
 def create_app() -> FastAPI:
+    """Verify classifier weights, then build and return the modelserver FastAPI app."""
     _verify_weights()
 
     app = FastAPI(
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["ops"])
     def health() -> dict:
+        """Return a simple liveness probe response."""
         return {"status": "ok"}
 
     return app

@@ -16,6 +16,7 @@ st.set_page_config(
 
 
 def _login_form() -> None:
+    """Render the login / registration tab UI for unauthenticated visitors."""
     st.title("Maintainer's Copilot")
     st.caption("Sign in to continue")
 
@@ -61,6 +62,7 @@ def _login_form() -> None:
 
 
 def _home() -> None:
+    """Render the landing page for authenticated users with navigation links."""
     user = st.session_state["user"]
     st.title("Maintainer's Copilot")
     st.write(f"Signed in as **{user['email']}** ({user['role']})")

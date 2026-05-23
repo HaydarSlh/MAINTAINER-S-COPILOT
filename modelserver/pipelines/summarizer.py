@@ -49,6 +49,7 @@ def _api_key() -> str:
 
 @lru_cache(maxsize=1)
 def _client():
+    """Return the cached Gemini client built with the resolved API key."""
     import google.genai as genai
     return genai.Client(api_key=_api_key())
 

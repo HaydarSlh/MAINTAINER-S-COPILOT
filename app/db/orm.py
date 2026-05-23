@@ -54,6 +54,7 @@ class UserORM(Base):
 
 
 class ConversationORM(Base):
+    """A chat conversation belonging to a user, optionally tied to a widget."""
     __tablename__ = "conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -66,6 +67,7 @@ class ConversationORM(Base):
 
 
 class MessageORM(Base):
+    """A single message (user, assistant, or tool) within a conversation."""
     __tablename__ = "messages"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

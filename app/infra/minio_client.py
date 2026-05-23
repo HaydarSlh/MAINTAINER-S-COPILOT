@@ -37,12 +37,14 @@ def _creds() -> tuple[str, str, str]:
 
 @lru_cache(maxsize=1)
 def _client():
+    """Return the cached MinIO client instance."""
     from minio import Minio
     endpoint, access_key, secret_key = _creds()
     return Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=False)
 
 
 def ensure_bucket(bucket: str) -> None:
+    """Create the bucket if it does not already exist."""
     client = _client()
     if not client.bucket_exists(bucket):
         client.make_bucket(bucket)
@@ -50,21 +52,25 @@ def ensure_bucket(bucket: str) -> None:
 
 def put_object(bucket: str, key: str, data: io.BytesIO, length: int,
                content_type: str = "application/octet-stream") -> None:
+    """Upload an in-memory BytesIO object to the specified bucket and key."""
     ensure_bucket(bucket)
     _client().put_object(bucket, key, data, length, content_type=content_type)
 
 
 def get_object(bucket: str, key: str) -> bytes:
+    """Download and return the raw bytes of an object from MinIO."""
     resp = _client().get_object(bucket, key)
     return resp.read()
 
 
 def fput_object(bucket: str, key: str, file_path: str) -> None:
+    """Upload a local file to MinIO by path."""
     ensure_bucket(bucket)
     _client().fput_object(bucket, key, file_path)
 
 
 def object_exists(bucket: str, key: str) -> bool:
+    """Return True if the object exists in MinIO, False otherwise."""
     try:
         _client().stat_object(bucket, key)
         return True
@@ -75,11 +81,13 @@ def object_exists(bucket: str, key: str) -> bool:
 # ── Eval report ───────────────────────────────────────────────────────────────
 
 def put_eval_report(report: dict, key: str = "classification/eval_report.json") -> None:
+    """Serialize and upload an eval report dict to the evals bucket."""
     data = json.dumps(report, indent=2).encode()
     put_object("evals", key, io.BytesIO(data), len(data), content_type="application/json")
 
 
 def get_previous_green_report(key: str = "classification/eval_report.json") -> dict | None:
+    """Fetch the last committed eval report from MinIO, or None if absent."""
     try:
         return json.loads(get_object("evals", key).decode())
     except Exception:
@@ -89,6 +97,7 @@ def get_previous_green_report(key: str = "classification/eval_report.json") -> d
 # ── Chunk snapshot ─────────────────────────────────────────────────────────────
 
 def put_chunk_snapshot(conversation_id: str, chunks: list[dict]) -> None:
+    """Persist a timestamped snapshot of retrieved RAG chunks to MinIO for debugging."""
     import time
     payload = json.dumps({
         "conversation_id": conversation_id,

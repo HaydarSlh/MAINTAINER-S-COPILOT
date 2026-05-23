@@ -29,6 +29,7 @@ def _engine():
 
 
 def get_engine():
+    """Return the cached async engine instance."""
     return _engine()
 
 
@@ -36,6 +37,7 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def _get_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the module-level session factory, creating it once on first call."""
     global _session_factory
     if _session_factory is None:
         _session_factory = async_sessionmaker(

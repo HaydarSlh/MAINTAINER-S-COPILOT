@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { fetchConfig } from "./api";
 import { Widget } from "./Widget";
 
+// Initialize the widget by reading the widget_id from the URL, fetching config, and mounting the React app.
 async function boot() {
   const params = new URLSearchParams(window.location.search);
   const widgetId = params.get("widget_id") ?? window.location.pathname.split("/").pop() ?? "";

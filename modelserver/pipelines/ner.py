@@ -35,6 +35,7 @@ DECORATOR  = "DECORATOR"
 
 @dataclass
 class Entity:
+    """A single extracted code-shaped entity with its label and character offsets."""
     text: str
     label: str
     start: int   # character offset in original text
@@ -64,6 +65,7 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 @lru_cache(maxsize=1)
 def _compiled_patterns() -> list[tuple[str, re.Pattern[str]]]:
+    """Return the module-level compiled pattern list (cached for the process lifetime)."""
     return _PATTERNS
 
 

@@ -23,6 +23,7 @@ SHORT_TERM_TTL_SECONDS = 1800   # 30 minutes
 
 @lru_cache(maxsize=1)
 def _client():
+    """Return the cached async Redis client."""
     import redis.asyncio as aioredis
     return aioredis.Redis(
         host=settings.redis_host,
@@ -48,27 +49,32 @@ async def set_conversation_state(conversation_id: str, state: dict,
 
 
 async def delete_conversation_state(conversation_id: str) -> None:
+    """Delete the short-term state for a conversation from Redis."""
     await _client().delete(f"conv:{conversation_id}")
 
 
 # ── Generic cache helpers ─────────────────────────────────────────────────────
 
 async def cache_get(key: str) -> Any | None:
+    """Retrieve a cached JSON value by key, or None if missing."""
     raw = await _client().get(key)
     return json.loads(raw) if raw is not None else None
 
 
 async def cache_set(key: str, value: Any, ttl: int = SHORT_TERM_TTL_SECONDS) -> None:
+    """Serialize value as JSON and store it in Redis with an explicit TTL."""
     await _client().setex(key, ttl, json.dumps(value))
 
 
 async def cache_delete(key: str) -> None:
+    """Remove a cached key from Redis."""
     await _client().delete(key)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
 
 async def ping() -> bool:
+    """Return True if Redis responds to a PING, False on any error."""
     try:
         return await _client().ping()
     except Exception:

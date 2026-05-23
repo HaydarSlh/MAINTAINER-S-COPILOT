@@ -27,6 +27,7 @@ async def set_short_term(conversation_id: str, state: dict,
 
 
 async def clear_short_term(conversation_id: str) -> None:
+    """Evict the short-term Redis state for a conversation."""
     await redis_client.delete_conversation_state(conversation_id)
 
 

@@ -14,14 +14,17 @@ from app.infra.tracing import span as trace_span
 
 
 class ModelServerError(Exception):
+    """Raised when the modelserver HTTP call fails or returns a non-2xx status."""
     pass
 
 
 def _base() -> str:
+    """Return the modelserver base URL with any trailing slash stripped."""
     return settings.modelserver_url.rstrip("/")
 
 
 async def _post(path: str, payload: dict) -> dict:
+    """POST JSON to a modelserver endpoint and return the parsed response dict."""
     url = f"{_base()}{path}"
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:

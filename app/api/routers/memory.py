@@ -17,6 +17,7 @@ router = APIRouter(tags=["memory"])
 
 
 class AuditEntry(BaseModel):
+    """Serialized audit-log row returned by the /memory/audit endpoint."""
     id: str
     actor_id: str | None
     action: str
@@ -28,6 +29,7 @@ class AuditEntry(BaseModel):
 
 @router.get("/memory", response_model=list[MemoryRecord])
 async def list_memories(user: User = Depends(get_current_user)) -> list[MemoryRecord]:
+    """Return all long-term memory records for the authenticated user."""
     from app.services.memory_service import list_memories as svc_list
     return await svc_list(user.id)
 
@@ -37,6 +39,7 @@ async def list_audit(
     limit: int = 100,
     _admin: User = Depends(require_admin),
 ) -> list[AuditEntry]:
+    """Return recent audit-log entries (admin only)."""
     from app.db.session import get_session
     from app.repositories import audit_repo
 
@@ -62,6 +65,7 @@ async def delete_memory(
     memory_id: str,
     user: User = Depends(get_current_user),
 ) -> None:
+    """Delete a specific long-term memory record (owner or admin only)."""
     from app.db.session import get_session
     from app.domain.exceptions import NotFoundError, PermissionDenied
     from app.repositories import memory_repo

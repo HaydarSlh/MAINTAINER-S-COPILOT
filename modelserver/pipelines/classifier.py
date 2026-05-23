@@ -23,6 +23,7 @@ MAX_LENGTH = 256
 
 @dataclass
 class ClassificationResult:
+    """Prediction output from the fine-tuned DistilBERT classifier."""
     label: str          # one of bug / feature / docs / question
     label_id: int
     confidence: float   # softmax probability of the top class
@@ -30,6 +31,7 @@ class ClassificationResult:
 
 
 def _load_model_card(card_path: Path) -> dict:
+    """Read and return the model card JSON from disk."""
     with open(card_path) as f:
         return json.load(f)
 

@@ -12,6 +12,7 @@ _VALID_TOOLS = {"classify_issue", "extract_entities", "search_docs",
 
 
 def _validate_origins(origins: list[str]) -> None:
+    """Raise ValidationError if any origin does not start with http:// or https://."""
     for o in origins:
         if not (o.startswith("http://") or o.startswith("https://")):
             from app.domain.exceptions import ValidationError
@@ -21,6 +22,7 @@ def _validate_origins(origins: list[str]) -> None:
 
 
 def _validate_tools(tools: list[str]) -> None:
+    """Raise ValidationError if any tool name is not in the allowed set."""
     unknown = set(tools) - _VALID_TOOLS
     if unknown:
         from app.domain.exceptions import ValidationError
@@ -34,6 +36,7 @@ async def create_widget(
     greeting: str,
     enabled_tools: list[str],
 ) -> WidgetConfig:
+    """Validate, persist, and audit-log a new widget config."""
     _validate_origins(allowed_origins)
     _validate_tools(enabled_tools)
 
@@ -66,6 +69,7 @@ async def update_widget(
     widget_id: str,
     **kwargs,
 ) -> WidgetConfig:
+    """Apply validated updates to a widget config and write an audit-log row."""
     if "allowed_origins" in kwargs:
         _validate_origins(kwargs["allowed_origins"])
     if "enabled_tools" in kwargs:
@@ -93,6 +97,7 @@ async def update_widget(
 
 
 async def get_public_config(widget_id: str) -> WidgetConfig | None:
+    """Return the public config for an active widget, or None if not found."""
     from app.db.session import get_session
     from app.repositories import widget_repo
 
@@ -101,6 +106,7 @@ async def get_public_config(widget_id: str) -> WidgetConfig | None:
 
 
 async def list_widgets() -> list[WidgetConfig]:
+    """Return all active widget configurations."""
     from app.db.session import get_session
     from app.repositories import widget_repo
 
