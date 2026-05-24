@@ -171,6 +171,23 @@ async def handle_message(
                     "name": tool_name,
                     "content": tool_result,
                 })
+
+            # After tool results, call without tools to force a full text answer.
+            # Passing tools=None prevents Gemini from calling another tool instead
+            # of writing the answer, which was causing one-sentence responses.
+            messages.append({
+                "role": "user",
+                "content": (
+                    "Now write your full answer based on the tool results above. "
+                    "Write at least 4-6 paragraphs. Explain every entity/finding in detail, "
+                    "include code examples, explain root causes, and end with next steps."
+                ),
+            })
+            with trace_span("chat.llm_final") as final_span:
+                final_span.set_attribute("chat.round", _round)
+                final_response = llm.chat(messages, tools=None)
+            final_text = final_response.content
+            break
         else:
             # Exceeded max rounds — ask LLM for final answer without tools
             messages.append({

@@ -99,7 +99,7 @@ def _call_gemini(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
     # for the 250-450 word target.
     config = gtypes.GenerateContentConfig(
         system_instruction=system_instruction,
-        max_output_tokens=2048,
+        max_output_tokens=8192,
         temperature=0.7,
     )
 
@@ -109,7 +109,7 @@ def _call_gemini(messages: list[dict], tools: list[dict] | None) -> LLMResponse:
         config = gtypes.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=gemini_tools,
-            max_output_tokens=2048,
+            max_output_tokens=8192,
             temperature=0.7,
         )
 

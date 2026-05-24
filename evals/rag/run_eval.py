@@ -149,10 +149,11 @@ def _ragas_score(rows: list[dict]) -> dict:
         from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
         from datasets import Dataset
         import os
+        import asyncio
 
         api_key = os.environ.get("GOOGLE_API_KEY", "")
         llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash", google_api_key=api_key
+            model="gemini-2.0-flash", google_api_key=api_key, temperature=0
         ))
         embeddings = LangchainEmbeddingsWrapper(GoogleGenerativeAIEmbeddings(
             model="models/embedding-001", google_api_key=api_key
@@ -167,12 +168,23 @@ def _ragas_score(rows: list[dict]) -> dict:
             }
             for r in rows
         ])
-        result = evaluate(
-            ds,
-            metrics=[faithfulness, answer_relevancy],
-            llm=llm,
-            embeddings=embeddings,
-        )
+
+        # Run in a fresh event loop to avoid conflicts with any running loop
+        async def _run():
+            return evaluate(
+                ds,
+                metrics=[faithfulness, answer_relevancy],
+                llm=llm,
+                embeddings=embeddings,
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(_run())
+        finally:
+            loop.close()
+
         return {
             "faithfulness":     round(float(result["faithfulness"]), 4),
             "answer_relevancy": round(float(result["answer_relevancy"]), 4),
