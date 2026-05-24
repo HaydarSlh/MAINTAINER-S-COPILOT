@@ -20,7 +20,7 @@
     "faithfulness": 0.0,
     "answer_relevancy": 0.0,
     "n": 25,
-    "error": "No module named 'ragas'"
+    "error": "No module named 'langchain_community.chat_models.vertexai'"
   },
   "gate_failures": [
     "faithfulness 0.0000 < threshold 0.75",

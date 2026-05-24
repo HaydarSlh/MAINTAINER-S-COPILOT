@@ -144,7 +144,19 @@ def _ragas_score(rows: list[dict]) -> dict:
     try:
         from ragas import evaluate
         from ragas.metrics import faithfulness, answer_relevancy
+        from ragas.llms import LangchainLLMWrapper
+        from ragas.embeddings import LangchainEmbeddingsWrapper
+        from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
         from datasets import Dataset
+        import os
+
+        api_key = os.environ.get("GOOGLE_API_KEY", "")
+        llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash", google_api_key=api_key
+        ))
+        embeddings = LangchainEmbeddingsWrapper(GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001", google_api_key=api_key
+        ))
 
         ds = Dataset.from_list([
             {
@@ -155,7 +167,12 @@ def _ragas_score(rows: list[dict]) -> dict:
             }
             for r in rows
         ])
-        result = evaluate(ds, metrics=[faithfulness, answer_relevancy])
+        result = evaluate(
+            ds,
+            metrics=[faithfulness, answer_relevancy],
+            llm=llm,
+            embeddings=embeddings,
+        )
         return {
             "faithfulness":     round(float(result["faithfulness"]), 4),
             "answer_relevancy": round(float(result["answer_relevancy"]), 4),

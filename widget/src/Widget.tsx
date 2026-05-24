@@ -45,8 +45,8 @@ export function Widget({ config, widgetId }: Props) {
   }, [convId, widgetId]);
 
   useEffect(() => {
-    // Tell the host page to resize the iframe whenever open state changes
-    window.parent.postMessage({ type: "copilot:resize", open }, "*");
+    const height = open ? 520 : 80;
+    window.parent.postMessage({ type: "copilot:resize", height }, "*");
   }, [open]);
 
   useEffect(() => {

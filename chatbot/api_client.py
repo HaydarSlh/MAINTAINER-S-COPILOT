@@ -72,7 +72,7 @@ def chat_stream(
         f"{API_BASE}/chat",
         json=payload,
         headers={**_headers(token), "Accept": "text/event-stream"},
-        timeout=60.0,
+        timeout=180.0,
     ) as resp:
         resp.raise_for_status()
         for line in resp.iter_lines():
