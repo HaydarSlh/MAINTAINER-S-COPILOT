@@ -28,3 +28,6 @@ widget/dist/
 
 # Local eval output (the canonical copy is written to MinIO blob)
 eval_report.json
+
+# Local Claude settings (contains secrets/local paths)
+.claude/settings.local.json
